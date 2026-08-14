@@ -30,14 +30,15 @@ class NearbyIssueCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.delete_outline, size: 18, color: AppColors.primaryGreen),
+              Icon(Icons.delete_outline,
+                  size: 18, color: AppColors.primaryGreen),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   issue.category,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -48,12 +49,12 @@ class NearbyIssueCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             issue.location,
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 4),
           Text(
             issue.distance,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               color: AppColors.primaryGreen,
               fontWeight: FontWeight.w600,
@@ -68,7 +69,7 @@ class NearbyIssueCard extends StatelessWidget {
             ),
             child: Text(
               issue.status,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: AppColors.darkGreen,
@@ -119,7 +120,7 @@ class ActivityTile extends StatelessWidget {
               children: [
                 Text(
                   activity.message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textPrimary,
                     height: 1.3,
@@ -128,7 +129,7 @@ class ActivityTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   activity.timeAgo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -153,7 +154,9 @@ class NotificationCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: notification.isRead ? Colors.white : AppColors.paleGreen.withOpacity(0.5),
+        color: notification.isRead
+            ? AppColors.cardColor
+            : AppColors.paleGreen.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: notification.isRead
@@ -166,7 +169,9 @@ class NotificationCard extends StatelessWidget {
         children: [
           Icon(
             Icons.notifications_active_outlined,
-            color: notification.isRead ? AppColors.textSecondary : AppColors.primaryGreen,
+            color: notification.isRead
+                ? AppColors.textSecondary
+                : AppColors.primaryGreen,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -175,7 +180,7 @@ class NotificationCard extends StatelessWidget {
               children: [
                 Text(
                   notification.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -183,7 +188,7 @@ class NotificationCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   notification.message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                     height: 1.4,
@@ -192,7 +197,7 @@ class NotificationCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   notification.timeAgo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                   ),

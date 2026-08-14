@@ -30,7 +30,9 @@ class ProgressTimeline extends StatelessWidget {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: isCompleted ? AppColors.primaryGreen : Colors.white,
+                    color: isCompleted
+                        ? AppColors.primaryGreen
+                        : AppColors.cardColor,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isCompleted

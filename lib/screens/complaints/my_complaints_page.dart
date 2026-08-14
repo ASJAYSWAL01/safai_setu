@@ -16,15 +16,16 @@ class MyComplaintsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'My Complaints',
-          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
       body: SafeArea(
         child: complaints.isEmpty
-            ? const Center(
+            ? Center(
                 child: Text(
                   'No complaints yet.\nReport waste to get started.',
                   textAlign: TextAlign.center,

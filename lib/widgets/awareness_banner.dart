@@ -11,7 +11,7 @@ class AwarenessBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.primaryGreen, AppColors.lightGreen],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

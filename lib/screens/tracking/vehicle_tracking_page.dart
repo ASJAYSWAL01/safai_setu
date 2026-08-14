@@ -16,9 +16,10 @@ class VehicleTrackingPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Vehicle Tracking',
-          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
@@ -28,7 +29,7 @@ class VehicleTrackingPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Waste Collection Vehicle Tracking',
                 style: TextStyle(
                   fontSize: 18,
@@ -37,7 +38,7 @@ class VehicleTrackingPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Live tracking preview using mock GPS data',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
@@ -63,7 +64,7 @@ class VehicleTrackingPage extends StatelessWidget {
                             color: AppColors.paleGreen,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.local_shipping_rounded,
                             color: AppColors.primaryGreen,
                           ),
@@ -75,7 +76,7 @@ class VehicleTrackingPage extends StatelessWidget {
                             children: [
                               Text(
                                 'Vehicle: ${vehicle.vehicleNumber}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
                                 ),
@@ -83,7 +84,7 @@ class VehicleTrackingPage extends StatelessWidget {
                               const SizedBox(height: 4),
                               Text(
                                 'Status: ${vehicle.status}',
-                                style: const TextStyle(color: AppColors.primaryGreen),
+                                style: TextStyle(color: AppColors.primaryGreen),
                               ),
                             ],
                           ),
@@ -91,8 +92,14 @@ class VehicleTrackingPage extends StatelessWidget {
                       ],
                     ),
                     const Divider(height: 24),
-                    _InfoLine(icon: Icons.person_outline, label: 'Driver', value: vehicle.driver),
-                    _InfoLine(icon: Icons.straighten, label: 'Distance', value: vehicle.distance),
+                    _InfoLine(
+                        icon: Icons.person_outline,
+                        label: 'Driver',
+                        value: vehicle.driver),
+                    _InfoLine(
+                        icon: Icons.straighten,
+                        label: 'Distance',
+                        value: vehicle.distance),
                     _InfoLine(
                       icon: Icons.access_time,
                       label: 'Estimated Arrival',
@@ -108,7 +115,8 @@ class VehicleTrackingPage extends StatelessWidget {
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Full route view will integrate maps later.'),
+                      content:
+                          Text('Full route view will integrate maps later.'),
                     ),
                   );
                 },
@@ -142,12 +150,12 @@ class _InfoLine extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],

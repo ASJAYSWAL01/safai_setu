@@ -20,7 +20,7 @@ class MapDashboardPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'City Map Dashboard',
                 style: TextStyle(
                   fontSize: 24,
@@ -29,7 +29,7 @@ class MapDashboardPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Track vehicles and waste hotspots',
                 style: TextStyle(color: AppColors.textSecondary),
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/collection_task.dart';
 import '../models/complaint.dart';
 import '../theme/app_theme.dart';
 
@@ -55,6 +56,53 @@ class StatusBadge extends StatelessWidget {
         style: TextStyle(
           color: _textColor,
           fontSize: compact ? 11 : 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class TaskStatusBadge extends StatelessWidget {
+  const TaskStatusBadge({super.key, required this.status});
+
+  final CollectionTaskStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg) = switch (status) {
+      CollectionTaskStatus.assigned => (
+          const Color(0xFFFFF3E0),
+          const Color(0xFFE65100)
+        ),
+      CollectionTaskStatus.enRoute => (
+          const Color(0xFFE3F2FD),
+          const Color(0xFF1565C0)
+        ),
+      CollectionTaskStatus.collecting => (
+          const Color(0xFFE8EAF6),
+          const Color(0xFF3949AB)
+        ),
+      CollectionTaskStatus.completed => (
+          AppColors.paleGreen,
+          AppColors.darkGreen
+        ),
+      CollectionTaskStatus.rejected => (
+          const Color(0xFFFFEBEE),
+          const Color(0xFFC62828)
+        ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status.label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),

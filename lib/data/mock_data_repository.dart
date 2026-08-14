@@ -63,7 +63,8 @@ class MockDataRepository {
     Complaint(
       id: 'SS1012',
       category: 'Plastic Waste',
-      description: 'Large amount of plastic waste accumulated near the market area.',
+      description:
+          'Large amount of plastic waste accumulated near the market area.',
       location: 'Sector 21, Gandhinagar',
       dateReported: DateTime(2026, 8, 8),
       status: ComplaintStatus.resolved,
@@ -130,7 +131,8 @@ class MockDataRepository {
         ),
         AppNotificationItem(
           title: 'Vehicle Approaching',
-          message: 'Waste collection vehicle will arrive in approximately 8 minutes.',
+          message:
+              'Waste collection vehicle will arrive in approximately 8 minutes.',
           timeAgo: '45 min ago',
           isRead: false,
         ),
@@ -180,6 +182,19 @@ class MockDataRepository {
     'Resolved',
   ];
 
+  /// Marks a complaint as resolved (called when a worker completes the
+  /// linked collection task with proof).
+  void resolveComplaint(String id) {
+    final index = _complaints.indexWhere((c) => c.id == id);
+    if (index == -1) return;
+    _complaints[index] = _complaints[index].copyWith(
+      status: ComplaintStatus.resolved,
+      timelineStep: 4,
+      assignedTo: 'Municipal Waste Collection Team',
+      estimatedResolution: 'Resolved',
+    );
+  }
+
   Complaint? getComplaintById(String id) {
     try {
       return _complaints.firstWhere((c) => c.id == id);
@@ -188,14 +203,26 @@ class MockDataRepository {
     }
   }
 
+  String _nextComplaintId() {
+    var maxNum = 1000;
+    for (final complaint in _complaints) {
+      final num = int.tryParse(complaint.id.replaceAll(RegExp(r'[^0-9]'), ''));
+      if (num != null && num > maxNum) maxNum = num;
+    }
+    return 'SS${maxNum + 1}';
+  }
+
   Complaint addComplaint({
     required String category,
     required String description,
     required String location,
     bool hasPhoto = false,
+    String? photoPath,
+    double? latitude,
+    double? longitude,
   }) {
     final newComplaint = Complaint(
-      id: 'SS1024',
+      id: _nextComplaintId(),
       category: category,
       description: description,
       location: location,
@@ -205,6 +232,9 @@ class MockDataRepository {
       estimatedResolution: '2 hours',
       timelineStep: 0,
       hasPhoto: hasPhoto,
+      photoPath: photoPath,
+      latitude: latitude,
+      longitude: longitude,
     );
     _complaints.insert(0, newComplaint);
     return newComplaint;

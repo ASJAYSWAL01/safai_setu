@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import '../../data/app_repository.dart';
 import '../../data/mock_data_repository.dart';
+import '../../models/collection_task.dart';
+import '../../models/complaint.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/progress_timeline.dart';
@@ -13,8 +18,18 @@ class ComplaintDetailsPage extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
   }
@@ -25,7 +40,7 @@ class ComplaintDetailsPage extends StatelessWidget {
 
     if (complaint == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Complaint Details')),
+        appBar: AppBar(title: Text('Complaint Details')),
         body: const Center(child: Text('Complaint not found')),
       );
     }
@@ -33,9 +48,10 @@ class ComplaintDetailsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Complaint Details',
-          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
@@ -54,7 +70,7 @@ class ComplaintDetailsPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             complaint.category,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
@@ -71,7 +87,8 @@ class ComplaintDetailsPage extends StatelessWidget {
                       value: _formatDate(complaint.dateReported),
                     ),
                     if (complaint.assignedTo != null)
-                      _DetailRow(label: 'Assigned To', value: complaint.assignedTo!),
+                      _DetailRow(
+                          label: 'Assigned To', value: complaint.assignedTo!),
                     if (complaint.estimatedResolution != null)
                       _DetailRow(
                         label: 'Estimated Resolution',
@@ -87,12 +104,13 @@ class ComplaintDetailsPage extends StatelessWidget {
                   children: [
                     const Text(
                       'Description',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       complaint.description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textSecondary,
                         height: 1.5,
                       ),
@@ -106,39 +124,26 @@ class ComplaintDetailsPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Photo',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      'Reported Photo',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 12),
-                    Container(
-                      height: 160,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppColors.paleGreen,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.borderColor),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.photo_camera_outlined,
-                            size: 40,
-                            color: AppColors.primaryGreen.withOpacity(0.6),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            complaint.hasPhoto
-                                ? 'Waste photo placeholder'
-                                : 'No photo attached',
-                            style: const TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
+                    _buildPhoto(complaint),
+                    const SizedBox(height: 4),
+                    Text(
+                      'This photo is shared with the collection worker and the department Head when a task is created from this complaint.',
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.textSecondary,
+                          height: 1.4),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              if (complaint.status == ComplaintStatus.resolved)
+                _ProofSection(complaintId: complaint.id),
               const SizedBox(height: 16),
               AppCard(
                 child: Column(
@@ -146,7 +151,8 @@ class ComplaintDetailsPage extends StatelessWidget {
                   children: [
                     const Text(
                       'Tracking Progress',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 16),
                     ProgressTimeline(currentStep: complaint.timelineStep),
@@ -161,7 +167,7 @@ class ComplaintDetailsPage extends StatelessWidget {
                         ),
                         child: Text(
                           'Assigned to ${complaint.assignedTo}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.darkGreen,
                             fontWeight: FontWeight.w600,
                           ),
@@ -175,6 +181,147 @@ class ComplaintDetailsPage extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhoto(Complaint complaint) {
+    final path = complaint.photoPath;
+    if (path != null && File(path).existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.file(
+          File(path),
+          height: 180,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    return Container(
+      height: 140,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.paleGreen,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderColor),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.photo_camera_outlined,
+            size: 40,
+            color: AppColors.primaryGreen.withOpacity(0.6),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            complaint.hasPhoto
+                ? 'Photo unavailable on this device'
+                : 'No photo attached',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows the worker's proof-of-work photo once the waste has been collected
+/// and the linked collection task completed by the pickup-truck worker.
+class _ProofSection extends StatelessWidget {
+  const _ProofSection({required this.complaintId});
+
+  final String complaintId;
+
+  @override
+  Widget build(BuildContext context) {
+    final task = AppRepository.instance.getProofForComplaint(complaintId);
+    if (task == null) {
+      return const SizedBox.shrink();
+    }
+
+    final path = task.proofPhotoPath;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified, color: AppColors.primaryGreen, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Work Completed — Proof Photo',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            task.status == CollectionTaskStatus.rejected
+                ? 'The proof was rejected by the department Head. The worker has been asked to redo the work.'
+                : 'The collection worker uploaded this photo after completing the work at the reported location.',
+            style: TextStyle(
+                fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          if (path != null && File(path).existsSync())
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.file(
+                File(path),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            )
+          else
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.paleGreen,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    task.status == CollectionTaskStatus.rejected
+                        ? Icons.gpp_bad_outlined
+                        : Icons.verified_outlined,
+                    size: 36,
+                    color: task.status == CollectionTaskStatus.rejected
+                        ? Colors.redAccent
+                        : AppColors.primaryGreen,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    task.status == CollectionTaskStatus.rejected
+                        ? 'Proof rejected by Head'
+                        : 'Waste collected & work verified ✓',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: task.status == CollectionTaskStatus.rejected
+                          ? Colors.redAccent
+                          : AppColors.darkGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (task.proofNote != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              task.proofNote!,
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            )
+          ],
+        ],
       ),
     );
   }
@@ -197,7 +344,7 @@ class _DetailRow extends StatelessWidget {
             width: 130,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 13,
               ),
@@ -206,7 +353,7 @@ class _DetailRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),

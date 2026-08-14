@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/validators.dart';
 import '../widgets/app_branding.dart';
@@ -8,6 +9,7 @@ import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/google_icon.dart';
 import '../widgets/or_divider.dart';
+import 'main_shell.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -40,10 +42,12 @@ class _SignUpPageState extends State<SignUpPage> {
     if (!_agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please agree to the Terms & Conditions and Privacy Policy.'),
+          content: const Text(
+              'Please agree to the Terms & Conditions and Privacy Policy.'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.redAccent.shade200,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       return;
@@ -55,25 +59,118 @@ class _SignUpPageState extends State<SignUpPage> {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
 
+    final error = AuthService.instance.signUpCitizen(
+      name: _fullNameController.text.trim(),
+      email: _emailController.text.trim(),
+      mobile: _mobileController.text.trim(),
+      password: _passwordController.text,
+    );
+
     setState(() => _isLoading = false);
+    if (!mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent.shade200,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    // Auto sign-in the new citizen.
+    AuthService.instance.loginCitizen(
+      emailOrMobile: _emailController.text,
+      password: _passwordController.text,
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Account creation UI ready — backend integration coming soon.'),
+        content:
+            const Text('Account created successfully! Welcome to Safai Setu.'),
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primaryGreen,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const MainShell()),
+    );
   }
 
-  void _showGoogleSignUpMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Google sign-up will be available soon.'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  Future<void> _handleGoogleSignUp() async {
+    final selected = await showModalBottomSheet<GoogleDemoAccount>(
+      context: context,
+      backgroundColor: AppColors.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: const [
+                  GoogleIcon(size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'Sign up with Google',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Demo mode — select a Google account to continue.',
+                style:
+                    TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              ...AuthService.googleAccounts.map((account) {
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.paleGreen,
+                    child: Text(
+                      account.name[0],
+                      style: TextStyle(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(account.name),
+                  subtitle: Text(account.email),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  onTap: () => Navigator.of(context).pop(account),
+                );
+              }),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() => _isLoading = true);
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    AuthService.instance.signInWithGoogle(selected);
+    setState(() => _isLoading = false);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const MainShell()),
     );
   }
 
@@ -112,7 +209,7 @@ class _SignUpPageState extends State<SignUpPage> {
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.cardColor,
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
@@ -125,7 +222,7 @@ class _SignUpPageState extends State<SignUpPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Create Account',
                                     style: TextStyle(
                                       fontSize: 24,
@@ -134,7 +231,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  const Text(
+                                  Text(
                                     'Join Safai Setu and help build a cleaner city.',
                                     style: TextStyle(
                                       fontSize: 14,
@@ -150,8 +247,9 @@ class _SignUpPageState extends State<SignUpPage> {
                                     prefixIcon: Icons.person_outline_rounded,
                                     keyboardType: TextInputType.name,
                                     textInputAction: TextInputAction.next,
-                                    validator: (value) =>
-                                        Validators.required(value, fieldName: 'Full name'),
+                                    validator: (value) => Validators.required(
+                                        value,
+                                        fieldName: 'Full name'),
                                   ),
                                   const SizedBox(height: 18),
                                   CustomTextField(
@@ -198,50 +296,61 @@ class _SignUpPageState extends State<SignUpPage> {
                                     obscureText: true,
                                     enablePasswordToggle: true,
                                     textInputAction: TextInputAction.done,
-                                    validator: (value) => Validators.confirmPassword(
+                                    validator: (value) =>
+                                        Validators.confirmPassword(
                                       value,
                                       _passwordController.text,
                                     ),
                                   ),
                                   const SizedBox(height: 16),
                                   Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Checkbox(
                                         value: _agreedToTerms,
                                         onChanged: (value) {
-                                          setState(() => _agreedToTerms = value ?? false);
+                                          setState(() =>
+                                              _agreedToTerms = value ?? false);
                                         },
                                       ),
                                       Expanded(
                                         child: GestureDetector(
                                           onTap: () {
-                                            setState(() => _agreedToTerms = !_agreedToTerms);
+                                            setState(() => _agreedToTerms =
+                                                !_agreedToTerms);
                                           },
                                           child: Padding(
-                                            padding: const EdgeInsets.only(top: 12),
+                                            padding:
+                                                const EdgeInsets.only(top: 12),
                                             child: RichText(
-                                              text: const TextSpan(
+                                              text: TextSpan(
                                                 style: TextStyle(
                                                   fontSize: 13,
-                                                  color: AppColors.textSecondary,
+                                                  color:
+                                                      AppColors.textSecondary,
                                                   height: 1.4,
                                                 ),
                                                 children: [
-                                                  TextSpan(text: 'I agree to the '),
+                                                  TextSpan(
+                                                      text: 'I agree to the '),
                                                   TextSpan(
                                                     text: 'Terms & Conditions',
                                                     style: TextStyle(
-                                                      color: AppColors.primaryGreen,
-                                                      fontWeight: FontWeight.w600,
+                                                      color: AppColors
+                                                          .primaryGreen,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
                                                   TextSpan(text: ' and '),
                                                   TextSpan(
                                                     text: 'Privacy Policy',
                                                     style: TextStyle(
-                                                      color: AppColors.primaryGreen,
-                                                      fontWeight: FontWeight.w600,
+                                                      color: AppColors
+                                                          .primaryGreen,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
                                                 ],
@@ -265,7 +374,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                   OutlinedSocialButton(
                                     label: 'Sign Up with Google',
                                     leading: const GoogleIcon(),
-                                    onPressed: _showGoogleSignUpMessage,
+                                    onPressed: _handleGoogleSignUp,
                                   ),
                                 ],
                               ),
@@ -274,7 +383,7 @@ class _SignUpPageState extends State<SignUpPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
+                                Text(
                                   'Already have an account? ',
                                   style: TextStyle(
                                     color: AppColors.textSecondary,
@@ -283,7 +392,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 ),
                                 GestureDetector(
                                   onTap: () => Navigator.of(context).pop(),
-                                  child: const Text(
+                                  child: Text(
                                     'Login',
                                     style: TextStyle(
                                       color: AppColors.primaryGreen,

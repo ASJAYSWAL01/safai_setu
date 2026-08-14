@@ -27,6 +27,9 @@ class Complaint {
     this.estimatedResolution,
     this.timelineStep = 0,
     this.hasPhoto = true,
+    this.photoPath,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -39,6 +42,13 @@ class Complaint {
   final String? estimatedResolution;
   final int timelineStep;
   final bool hasPhoto;
+
+  /// Path of the photo the citizen took when reporting (stored on-device).
+  final String? photoPath;
+
+  /// GPS coordinates captured by the citizen when reporting.
+  final double? latitude;
+  final double? longitude;
 
   Complaint copyWith({
     ComplaintStatus? status,
@@ -57,6 +67,9 @@ class Complaint {
       estimatedResolution: estimatedResolution ?? this.estimatedResolution,
       timelineStep: timelineStep ?? this.timelineStep,
       hasPhoto: hasPhoto,
+      photoPath: photoPath ?? this.photoPath,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }

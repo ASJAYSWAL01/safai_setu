@@ -76,15 +76,19 @@ class _CustomTextFieldState extends State<CustomTextField> {
           decoration: InputDecoration(
             hintText: widget.hint ?? widget.label,
             prefixIcon: widget.prefixIcon != null
-                ? Icon(widget.prefixIcon, size: 22, color: const Color(0xFF2E7D32))
+                ? Icon(widget.prefixIcon,
+                    size: 22, color: const Color(0xFF2E7D32))
                 : null,
             suffixIcon: widget.enablePasswordToggle
                 ? IconButton(
                     icon: Icon(
-                      _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscureText
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: const Color(0xFF616161),
                     ),
-                    onPressed: () => setState(() => _obscureText = !_obscureText),
+                    onPressed: () =>
+                        setState(() => _obscureText = !_obscureText),
                   )
                 : null,
           ),

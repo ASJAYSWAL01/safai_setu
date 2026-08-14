@@ -21,7 +21,7 @@ class DashboardActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.cardColor,
       borderRadius: BorderRadius.circular(18),
       elevation: 0,
       shadowColor: Colors.black.withOpacity(0.06),
@@ -60,7 +60,7 @@ class DashboardActionCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -69,7 +69,7 @@ class DashboardActionCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                           height: 1.3,

@@ -28,9 +28,10 @@ class WasteHotspotPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Waste Hotspots',
-          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
@@ -48,13 +49,14 @@ class WasteHotspotPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Areas requiring higher collection priority',
                 style: TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.orange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -88,13 +90,14 @@ class WasteHotspotPage extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 hotspot.sector,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                            RiskBadge(label: hotspot.riskLevel.label, color: color),
+                            RiskBadge(
+                                label: hotspot.riskLevel.label, color: color),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -139,7 +142,7 @@ class _HotspotRow extends StatelessWidget {
       children: [
         Text(
           '$label: ',
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         Text(
           value,

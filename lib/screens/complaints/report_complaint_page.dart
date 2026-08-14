@@ -24,6 +24,8 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
   final ImagePicker _picker = ImagePicker();
   String? _photoPath;
   String _location = 'Not set (tap button below to fetch)';
+  double? _latitude;
+  double? _longitude;
   bool _isSubmitting = false;
   bool _isLocationLoading = false;
 
@@ -52,7 +54,10 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
       );
 
       setState(() {
-        _location = 'Lat: ${position.latitude.toStringAsFixed(6)}, Long: ${position.longitude.toStringAsFixed(6)}';
+        _location =
+            'Lat: ${position.latitude.toStringAsFixed(6)}, Long: ${position.longitude.toStringAsFixed(6)}';
+        _latitude = position.latitude;
+        _longitude = position.longitude;
       });
     } catch (e) {
       if (mounted) {
@@ -113,6 +118,9 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
       description: _descriptionController.text.trim(),
       location: _location,
       hasPhoto: _photoPath != null,
+      photoPath: _photoPath,
+      latitude: _latitude,
+      longitude: _longitude,
     );
 
     setState(() => _isSubmitting = false);
@@ -121,11 +129,11 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.check_circle, color: AppColors.primaryGreen),
-            SizedBox(width: 8),
-            Expanded(child: Text('Complaint Submitted Successfully!')),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Complaint Submitted Successfully!')),
           ],
         ),
         content: Text('Complaint ID: ${complaint.id}'),
@@ -151,9 +159,10 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Report Waste',
-          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         centerTitle: true,
       ),
@@ -172,9 +181,10 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   value: _selectedCategory,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Select waste category',
-                    prefixIcon: Icon(Icons.category_outlined, color: AppColors.primaryGreen),
+                    prefixIcon: Icon(Icons.category_outlined,
+                        color: AppColors.primaryGreen),
                   ),
                   items: MockDataRepository.wasteCategories
                       .map(
@@ -184,7 +194,8 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) => setState(() => _selectedCategory = value),
+                  onChanged: (value) =>
+                      setState(() => _selectedCategory = value),
                   validator: (value) =>
                       value == null ? 'Please select a waste category' : null,
                 ),
@@ -205,12 +216,12 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 10),
-                 GestureDetector(
+                GestureDetector(
                   onTap: _photoPath == null ? _takePhoto : null,
                   child: Container(
                     height: 160,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.cardColor,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _photoPath != null
@@ -235,7 +246,8 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                                 top: 8,
                                 right: 8,
                                 child: GestureDetector(
-                                  onTap: () => setState(() => _photoPath = null),
+                                  onTap: () =>
+                                      setState(() => _photoPath = null),
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: const BoxDecoration(
@@ -254,9 +266,10 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                           )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.add_a_photo_outlined, size: 36, color: AppColors.primaryGreen),
-                              SizedBox(height: 8),
+                            children: [
+                              Icon(Icons.add_a_photo_outlined,
+                                  size: 36, color: AppColors.primaryGreen),
+                              const SizedBox(height: 8),
                               Text(
                                 'Add Waste Photo',
                                 style: TextStyle(
@@ -277,7 +290,7 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.cardColor,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.borderColor),
                   ),
@@ -285,10 +298,11 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        children: const [
-                          Icon(Icons.location_on, color: AppColors.primaryGreen),
-                          SizedBox(width: 8),
-                          Text(
+                        children: [
+                          Icon(Icons.location_on,
+                              color: AppColors.primaryGreen),
+                          const SizedBox(width: 8),
+                          const Text(
                             'Current Location',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
@@ -297,22 +311,26 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                       const SizedBox(height: 8),
                       Text(
                         _location,
-                        style: const TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: _isLocationLoading ? null : _getCurrentLocation,
+                        onPressed:
+                            _isLocationLoading ? null : _getCurrentLocation,
                         icon: _isLocationLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.primaryGreen),
                                 ),
                               )
                             : const Icon(Icons.my_location, size: 18),
-                        label: Text(_isLocationLoading ? 'Fetching Location...' : 'Use Current Location'),
+                        label: Text(_isLocationLoading
+                            ? 'Fetching Location...'
+                            : 'Use Current Location'),
                       ),
                     ],
                   ),

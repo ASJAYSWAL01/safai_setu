@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/validators.dart';
 import '../widgets/app_branding.dart';
@@ -31,11 +32,32 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
+    final error = AuthService.instance.loginCitizen(
+      emailOrMobile: _emailOrMobileController.text,
+      password: _passwordController.text,
+    );
+
     setState(() => _isLoading = false);
+    if (!mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent.shade200,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const MainShell()),
     );
@@ -58,14 +80,78 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _showGoogleSignInMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Google sign-in will be available soon.'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  /// Simulated Google sign-in: shows the demo Google account chooser, then
+  /// signs the citizen in. With real backend credentials this maps 1:1 to the
+  /// official Google Sign-In / Firebase Auth flow (see README).
+  Future<void> _handleGoogleSignIn() async {
+    final selected = await showModalBottomSheet<GoogleDemoAccount>(
+      context: context,
+      backgroundColor: AppColors.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: const [
+                  GoogleIcon(size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'Choose a Google account',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Demo mode — no real Google credentials configured yet.',
+                style:
+                    TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              ...AuthService.googleAccounts.map((account) {
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.paleGreen,
+                    child: Text(
+                      account.name[0],
+                      style: TextStyle(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(account.name),
+                  subtitle: Text(account.email),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  onTap: () => Navigator.of(context).pop(account),
+                );
+              }),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() => _isLoading = true);
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    AuthService.instance.signInWithGoogle(selected);
+    setState(() => _isLoading = false);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const MainShell()),
     );
   }
 
@@ -91,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.cardColor,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
@@ -104,7 +190,7 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
+                            Text(
                               'Welcome Back',
                               style: TextStyle(
                                 fontSize: 24,
@@ -113,7 +199,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Text(
+                            Text(
                               'Sign in to continue reporting and tracking waste.',
                               style: TextStyle(
                                 fontSize: 14,
@@ -149,9 +235,11 @@ class _LoginPageState extends State<LoginPage> {
                               child: TextButton(
                                 onPressed: _showForgotPasswordMessage,
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: const Text('Forgot Password?'),
                               ),
@@ -169,7 +257,7 @@ class _LoginPageState extends State<LoginPage> {
                             OutlinedSocialButton(
                               label: 'Continue with Google',
                               leading: const GoogleIcon(),
-                              onPressed: _showGoogleSignInMessage,
+                              onPressed: _handleGoogleSignIn,
                             ),
                           ],
                         ),
@@ -178,7 +266,7 @@ class _LoginPageState extends State<LoginPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             "Don't have an account? ",
                             style: TextStyle(
                               color: AppColors.textSecondary,
@@ -187,7 +275,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           GestureDetector(
                             onTap: _navigateToSignUp,
-                            child: const Text(
+                            child: Text(
                               'Sign Up',
                               style: TextStyle(
                                 color: AppColors.primaryGreen,

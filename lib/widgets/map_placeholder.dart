@@ -43,14 +43,15 @@ class MapPlaceholder extends StatelessWidget {
               top: 12,
               left: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.92),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   title!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
@@ -59,12 +60,12 @@ class MapPlaceholder extends StatelessWidget {
               ),
             ),
           if (showUserLocation)
-            const Positioned(
+            Positioned(
               left: 48,
               bottom: 52,
-              child: _MapMarker(
+              child: const _MapMarker(
                 icon: Icons.person_pin_circle,
-                color: AppColors.primaryGreen,
+                color: Color(0xFF2E7D32),
                 label: 'You',
               ),
             ),
@@ -82,17 +83,17 @@ class MapPlaceholder extends StatelessWidget {
             const Positioned(
               left: 120,
               top: 90,
-              child: _MapDot(color: AppColors.lightGreen),
+              child: _MapDot(color: Color(0xFF4CAF50)),
             ),
             const Positioned(
               right: 90,
               bottom: 80,
-              child: _MapDot(color: AppColors.lightGreen),
+              child: _MapDot(color: Color(0xFF4CAF50)),
             ),
             const Positioned(
               left: 80,
               top: 140,
-              child: _MapDot(color: AppColors.lightGreen),
+              child: _MapDot(color: Color(0xFF4CAF50)),
             ),
           ],
           if (showHotspots) ...[
@@ -109,7 +110,7 @@ class MapPlaceholder extends StatelessWidget {
             const Positioned(
               left: 60,
               bottom: 70,
-              child: _HotspotMarker(color: AppColors.lightGreen, label: 'Low'),
+              child: _HotspotMarker(color: Color(0xFF4CAF50), label: 'Low'),
             ),
           ],
           if (showLegend)
@@ -122,9 +123,10 @@ class MapPlaceholder extends StatelessWidget {
                   color: Colors.white.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
+                child: Text(
                   'Map preview — demo data',
-                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 10, color: AppColors.textSecondary),
                 ),
               ),
             ),
@@ -195,7 +197,8 @@ class _MapMarker extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: 10, color: color, fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -243,7 +246,8 @@ class _HotspotMarker extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w700),
+          style:
+              TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w700),
         ),
       ],
     );
