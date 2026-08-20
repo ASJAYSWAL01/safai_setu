@@ -1,40 +1,63 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'pressable_scale.dart';
 
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
+    this.margin = EdgeInsets.zero,
     this.onTap,
+    this.color,
   });
 
   final Widget child;
   final EdgeInsets padding;
+
+  /// Space around the card (e.g. a bottom gap between stacked cards, so
+  /// their drop shadows don't blend into each other).
+  final EdgeInsets margin;
   final VoidCallback? onTap;
+
+  /// Optional accent tint used for the card's soft shadow and gradient.
+  /// Defaults to the brand green.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final accent = color ?? AppColors.primaryGreen;
+
     final card = Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.cardColor,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: AppColors.isDark
+              ? const [Color(0xFF202A23), Color(0xFF1A221D)]
+              : const [Colors.white, Color(0xFFF8FCF9)],
+        ),
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderColor.withOpacity(0.55)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: AppColors.isDark
+                ? Colors.black.withOpacity(0.35)
+                : accent.withOpacity(0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: child,
     );
 
+    Widget content = card;
     if (onTap != null) {
-      return Material(
+      content = Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
@@ -42,8 +65,11 @@ class AppCard extends StatelessWidget {
           child: card,
         ),
       );
+      content = PressableScale(child: content);
     }
-    return card;
+
+    if (margin == EdgeInsets.zero) return content;
+    return Padding(padding: margin, child: content);
   }
 }
 

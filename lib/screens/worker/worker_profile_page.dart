@@ -4,21 +4,19 @@ import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/language_picker.dart';
 import '../../widgets/theme_switch_tile.dart';
 import '../about/about_page.dart';
-import '../auth/role_select_page.dart';
+import '../auth/auth_gate.dart';
+import '../manual/user_manual_page.dart';
+import '../support/call_assistant_page.dart';
+import '../support/development_team_page.dart';
 import '../support/help_support_page.dart';
 
 class WorkerProfilePage extends StatelessWidget {
   const WorkerProfilePage({super.key});
 
-  void _logout(BuildContext context) {
-    AuthService.instance.logout();
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const RoleSelectPage()),
-      (route) => false,
-    );
-  }
+  Future<void> _logout(BuildContext context) => performLogout(context);
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +37,7 @@ class WorkerProfilePage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: const Color(0xFF1565C0).withOpacity(0.1),
-                child: const Icon(Icons.local_shipping_rounded,
-                    size: 44, color: Color(0xFF1565C0)),
-              ),
+              _Avatar(worker: worker),
               const SizedBox(height: 14),
               Text(
                 worker.name,
@@ -96,6 +89,38 @@ class WorkerProfilePage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const ThemeSwitchTile(),
+              const LanguageTile(),
+              _MenuTile(
+                icon: Icons.menu_book_outlined,
+                title: 'User Manual',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) =>
+                            const UserManualPage(role: UserRole.worker)),
+                  );
+                },
+              ),
+              _MenuTile(
+                icon: Icons.support_agent,
+                title: 'Call Our Assistant',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const CallAssistantPage()),
+                  );
+                },
+              ),
+              _MenuTile(
+                icon: Icons.engineering_outlined,
+                title: 'Development Team',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const DevelopmentTeamPage()),
+                  );
+                },
+              ),
               _MenuTile(
                 icon: Icons.help_outline,
                 title: 'Help & Support',
@@ -138,6 +163,31 @@ class WorkerProfilePage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.worker});
+
+  final AppUser worker;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = worker.photoUrl;
+    if (photo != null && photo.isNotEmpty) {
+      return CircleAvatar(
+        radius: 44,
+        backgroundColor: const Color(0xFF1565C0).withOpacity(0.1),
+        backgroundImage: NetworkImage(photo),
+        onBackgroundImageError: (_, __) {},
+      );
+    }
+    return CircleAvatar(
+      radius: 44,
+      backgroundColor: const Color(0xFF1565C0).withOpacity(0.1),
+      child: const Icon(Icons.local_shipping_rounded,
+          size: 44, color: Color(0xFF1565C0)),
     );
   }
 }

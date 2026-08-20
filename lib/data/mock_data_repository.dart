@@ -122,24 +122,24 @@ class MockDataRepository {
         ),
       ];
 
-  List<AppNotificationItem> get notifications => const [
+  List<AppNotificationItem> get notifications => [
         AppNotificationItem(
           title: 'Complaint Assigned',
           message: 'Complaint SS1024 has been assigned to a collection team.',
-          timeAgo: '1 hour ago',
+          createdAt: DateTime.now().subtract(const Duration(hours: 1)),
           isRead: false,
         ),
         AppNotificationItem(
           title: 'Vehicle Approaching',
           message:
               'Waste collection vehicle will arrive in approximately 8 minutes.',
-          timeAgo: '45 min ago',
+          createdAt: DateTime.now().subtract(const Duration(minutes: 45)),
           isRead: false,
         ),
         AppNotificationItem(
           title: 'Complaint Resolved',
           message: 'Your complaint SS1018 has been successfully resolved.',
-          timeAgo: '2 hours ago',
+          createdAt: DateTime.now().subtract(const Duration(hours: 2)),
           isRead: true,
         ),
       ];

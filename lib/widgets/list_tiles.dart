@@ -14,7 +14,7 @@ class NearbyIssueCard extends StatelessWidget {
       width: 220,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderColor.withOpacity(0.7)),
         boxShadow: [
@@ -93,6 +93,10 @@ class ActivityTile extends StatelessWidget {
         return Icons.check_circle_outline;
       case 'truck':
         return Icons.local_shipping_outlined;
+      case 'pending':
+        return Icons.hourglass_top_rounded;
+      case 'rejected':
+        return Icons.cancel_outlined;
       default:
         return Icons.assignment_outlined;
     }
@@ -144,15 +148,19 @@ class ActivityTile extends StatelessWidget {
 }
 
 class NotificationCard extends StatelessWidget {
-  const NotificationCard({super.key, required this.notification});
+  const NotificationCard({
+    super.key,
+    required this.notification,
+    this.onTap,
+  });
 
   final AppNotificationItem notification;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: notification.isRead
             ? AppColors.cardColor
@@ -164,7 +172,15 @@ class NotificationCard extends StatelessWidget {
               : AppColors.lightGreen.withOpacity(0.4),
         ),
       ),
-      child: Row(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
@@ -207,6 +223,9 @@ class NotificationCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  ),
+),
+);
   }
 }

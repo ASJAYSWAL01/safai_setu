@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../data/app_repository.dart';
 import '../../models/collection_task.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/location_service.dart';
+import '../../services/task_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/call_utils.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/worker_avatar.dart';
 import 'head_edit_worker_page.dart';
 import 'head_generate_worker_id_page.dart';
 import 'head_worker_detail_page.dart';
@@ -18,13 +21,73 @@ class HeadWorkersPage extends StatefulWidget {
 }
 
 class _HeadWorkersPageState extends State<HeadWorkersPage> {
+  List<AppUser> _workers = [];
+  Map<String, int> _activeTaskCounts = {};
+  Map<String, WorkerLocation> _locations = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorkers();
+  }
+
+  Future<void> _loadWorkers() async {
+    List<AppUser> workers;
+    try {
+      workers = await AuthService.instance.workers;
+    } on Object {
+      workers = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _workers = workers;
+      _loading = false;
+    });
+    _loadActiveCounts(workers);
+    _loadLocations();
+  }
+
+  Future<void> _loadLocations() async {
+    List<WorkerLocation> locations;
+    try {
+      locations = await LocationService.instance.fetchLocations();
+    } on Object {
+      locations = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _locations = {
+        for (final loc in locations) loc.workerId: loc,
+      };
+    });
+  }
+
+  Future<void> _loadActiveCounts(List<AppUser> workers) async {
+    final counts = <String, int>{};
+    for (final worker in workers) {
+      final id = worker.workerId;
+      if (id == null) continue;
+      try {
+        final tasks = await TaskService.instance.fetchTasksForWorker(id);
+        counts[id] = tasks
+            .where((t) => t.status != CollectionTaskStatus.completed)
+            .length;
+      } on Object {
+        counts[id] = 0;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _activeTaskCounts = counts);
+  }
+
   Future<void> _openEdit(AppUser worker) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => HeadEditWorkerPage(workerId: worker.id),
       ),
     );
-    if (mounted) setState(() {});
+    if (mounted) _loadWorkers();
   }
 
   Future<void> _deleteWorker(AppUser worker) async {
@@ -51,14 +114,22 @@ class _HeadWorkersPageState extends State<HeadWorkersPage> {
     );
     if (confirmed != true || !mounted) return;
 
-    final error = AuthService.instance.deleteWorker(worker.id);
+    final error = await AuthService.instance.deleteWorker(worker.id);
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    setState(() {});
+    final workerId = worker.workerId;
+    if (workerId != null) {
+      try {
+        await LocationService.instance.clearLocation(workerId);
+      } on Object catch (e) {
+        debugPrint('Failed to clear location for $workerId: $e');
+      }
+    }
+    await _loadWorkers();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${worker.name} deleted. Tasks unassigned.')),
     );
@@ -66,7 +137,7 @@ class _HeadWorkersPageState extends State<HeadWorkersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final workers = AuthService.instance.workers;
+    final workers = _workers;
 
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
@@ -91,7 +162,9 @@ class _HeadWorkersPageState extends State<HeadWorkersPage> {
         ],
       ),
       body: SafeArea(
-        child: workers.isEmpty
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : workers.isEmpty
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -108,13 +181,12 @@ class _HeadWorkersPageState extends State<HeadWorkersPage> {
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final worker = workers[index];
-                  final activeTasks = AppRepository.instance
-                      .tasksForWorker(worker.workerId!)
-                      .where((t) => t.status != CollectionTaskStatus.completed)
-                      .length;
-                  final location =
-                      AppRepository.instance.lastLocation(worker.workerId!);
-                  final isLive = location != null;
+                  final workerId = worker.workerId;
+                  final activeTasks = _activeTaskCounts[workerId] ?? 0;
+                  final location = workerId == null
+                      ? null
+                      : _locations[workerId];
+                  final isLive = location?.isLive ?? false;
 
                   return AppCard(
                     onTap: () async {
@@ -124,25 +196,18 @@ class _HeadWorkersPageState extends State<HeadWorkersPage> {
                               HeadWorkerDetailPage(workerId: worker.id),
                         ),
                       );
-                      if (mounted) setState(() {});
+                      if (mounted) _loadWorkers();
                     },
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
+                            WorkerAvatar(
+                              name: worker.name,
+                              photoUrl: worker.photoUrl,
                               radius: 22,
-                              backgroundColor:
-                                  const Color(0xFF6A1B9A).withOpacity(0.1),
-                              child: Text(
-                                worker.name[0],
-                                style: TextStyle(
-                                  color: Color(0xFF6A1B9A),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
+                              accent: const Color(0xFF6A1B9A),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -166,6 +231,19 @@ class _HeadWorkersPageState extends State<HeadWorkersPage> {
                               ),
                             ),
                             _LivePill(isLive: isLive),
+                            const SizedBox(width: 4),
+                            if (worker.phone?.trim().isNotEmpty == true)
+                              IconButton(
+                                tooltip: 'Call ${worker.name}',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints.tightFor(
+                                    width: 34, height: 34),
+                                visualDensity: VisualDensity.compact,
+                                icon: const Icon(Icons.call_outlined,
+                                    size: 20, color: Color(0xFF1565C0)),
+                                onPressed: () => callPhoneNumber(context,
+                                    phone: worker.phone!),
+                              ),
                             PopupMenuButton<String>(
                               tooltip: 'Worker actions',
                               onSelected: (value) {

@@ -4,15 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../data/app_repository.dart';
-import '../../data/mock_data_repository.dart';
+import '../../models/collection_task.dart';
 import '../../models/complaint.dart';
+import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/complaint_service.dart';
+import '../../services/task_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/live_map_view.dart';
+import '../../widgets/viewable_image.dart';
 
 class HeadAssignTaskPage extends StatefulWidget {
   const HeadAssignTaskPage({
@@ -44,36 +47,78 @@ class _HeadAssignTaskPageState extends State<HeadAssignTaskPage> {
   final _lngController = TextEditingController();
   String? _selectedWorkerId;
   String? _linkedComplaintId;
+  Complaint? _linkedComplaint;
   bool _isCreating = false;
+  List<AppUser> _workers = [];
 
   @override
   void initState() {
     super.initState();
-    final workers = AuthService.instance.workers;
-    _selectedWorkerId = widget.preSelectedWorkerId ??
-        (workers.isNotEmpty ? workers.first.workerId : null);
+    _loadWorkers();
 
-    final preset = widget.preSelectedTaskId == null
-        ? null
-        : AppRepository.instance.getTaskById(widget.preSelectedTaskId!);
-    if (preset != null) {
-      _titleController.text = preset.title;
-      _descriptionController.text = preset.description;
-      _latController.text = preset.latitude.toString();
-      _lngController.text = preset.longitude.toString();
+    if (widget.preSelectedTaskId != null) {
+      _loadPresetTask(widget.preSelectedTaskId!);
     }
 
-    final complaint = widget.preSelectedComplaintId == null
-        ? null
-        : MockDataRepository.instance
-            .getComplaintById(widget.preSelectedComplaintId!);
-    if (complaint != null) {
-      _linkedComplaintId = complaint.id;
-      _titleController.text = complaint.category;
-      _descriptionController.text = complaint.description;
-      _latController.text = (complaint.latitude ?? 23.2156).toString();
-      _lngController.text = (complaint.longitude ?? 72.6369).toString();
+    if (widget.preSelectedComplaintId != null) {
+      _loadLinkedComplaint(widget.preSelectedComplaintId!);
     }
+  }
+
+  Future<void> _loadPresetTask(String taskId) async {
+    CollectionTask? preset;
+    try {
+      preset = await TaskService.instance.getTaskById(taskId);
+    } on Object {
+      preset = null;
+    }
+    if (!mounted || preset == null) return;
+    final title = preset.title;
+    final description = preset.description;
+    final lat = preset.latitude;
+    final lng = preset.longitude;
+    setState(() {
+      _titleController.text = title;
+      _descriptionController.text = description;
+      _latController.text = lat.toString();
+      _lngController.text = lng.toString();
+    });
+  }
+
+  Future<void> _loadLinkedComplaint(String complaintId) async {
+    Complaint? complaint;
+    try {
+      complaint =
+          await ComplaintService.instance.getComplaintById(complaintId);
+    } on Object {
+      complaint = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _linkedComplaint = complaint;
+      if (complaint != null) {
+        _linkedComplaintId = complaint.id;
+        _titleController.text = complaint.category;
+        _descriptionController.text = complaint.description;
+        _latController.text = (complaint.latitude ?? 23.2156).toString();
+        _lngController.text = (complaint.longitude ?? 72.6369).toString();
+      }
+    });
+  }
+
+  Future<void> _loadWorkers() async {
+    List<AppUser> workers;
+    try {
+      workers = await AuthService.instance.workers;
+    } on Object {
+      workers = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _workers = workers;
+      _selectedWorkerId = widget.preSelectedWorkerId ??
+          (workers.isNotEmpty ? workers.first.workerId : null);
+    });
   }
 
   @override
@@ -94,28 +139,42 @@ class _HeadAssignTaskPageState extends State<HeadAssignTaskPage> {
     if (lat == null || lng == null) return;
 
     setState(() => _isCreating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-
-    if (widget.preSelectedTaskId != null) {
-      // Re-assigning an existing unassigned task.
-      AppRepository.instance
-          .assignTask(widget.preSelectedTaskId!, _selectedWorkerId!);
-    } else {
-      AppRepository.instance.addTask(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        latitude: lat,
-        longitude: lng,
-        workerId: _selectedWorkerId,
-        citizenComplaintId: _linkedComplaintId,
+    try {
+      if (widget.preSelectedTaskId != null) {
+        // Re-assigning an existing unassigned task.
+        await TaskService.instance
+            .assignTask(widget.preSelectedTaskId!, _selectedWorkerId!);
+      } else {
+        await TaskService.instance.createTask(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          latitude: lat,
+          longitude: lng,
+          workerId: _selectedWorkerId,
+          citizenComplaintId: _linkedComplaintId,
+        );
+      }
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _isCreating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not save the task: $e'),
+          backgroundColor: Colors.redAccent.shade200,
+        ),
       );
+      return;
     }
-
-    setState(() => _isCreating = false);
     if (!mounted) return;
 
-    final worker = AuthService.instance.getWorkerByWorkerId(_selectedWorkerId!);
+    AppUser? worker;
+    try {
+      worker =
+          await AuthService.instance.getWorkerByWorkerId(_selectedWorkerId!);
+    } on Object {
+      worker = null;
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -130,13 +189,11 @@ class _HeadAssignTaskPageState extends State<HeadAssignTaskPage> {
 
   @override
   Widget build(BuildContext context) {
-    final workers = AuthService.instance.workers;
+    final workers = _workers;
     final lat = _parseCoord(_latController.text);
     final lng = _parseCoord(_lngController.text);
     final showMap = lat != null && lng != null;
-    final linkedComplaint = _linkedComplaintId == null
-        ? null
-        : MockDataRepository.instance.getComplaintById(_linkedComplaintId!);
+    final linkedComplaint = _linkedComplaint;
 
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
@@ -254,12 +311,12 @@ class _HeadAssignTaskPageState extends State<HeadAssignTaskPage> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1A1A),
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        initialValue: _selectedWorkerId,
+                        value: _selectedWorkerId,
                         decoration: InputDecoration(
                           prefixIcon: Icon(Icons.person_outline,
                               size: 22, color: AppColors.primaryGreen),
@@ -358,7 +415,7 @@ class _ComplaintLinkBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'From citizen complaint #${complaint.id}',
+                  'From citizen complaint #${complaint.displayId}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -374,16 +431,39 @@ class _ComplaintLinkBanner extends StatelessWidget {
             style: TextStyle(
                 fontSize: 12, color: AppColors.textSecondary, height: 1.4),
           ),
-          if (path != null && File(path).existsSync()) ...[
+          if (path != null &&
+              (path.startsWith('http://') || path.startsWith('https://'))) ...[
             const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.file(
-                File(path),
-                height: 110,
-                width: double.infinity,
-                fit: BoxFit.cover,
+            ViewableImage(
+              thumbnail: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  path,
+                  height: 110,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
               ),
+              dialogImage: Image.network(
+                path,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ] else if (path != null && File(path).existsSync()) ...[
+            const SizedBox(height: 10),
+            ViewableImage(
+              thumbnail: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(
+                  File(path),
+                  height: 110,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              dialogImage: Image.file(File(path), fit: BoxFit.contain),
             ),
           ],
         ],

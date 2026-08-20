@@ -4,17 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../data/app_repository.dart';
-import '../../data/mock_data_repository.dart';
 import '../../models/collection_task.dart';
 import '../../models/complaint.dart';
+import '../../services/complaint_service.dart';
+import '../../services/task_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/citizen_contact_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/live_map_view.dart';
 import '../../widgets/progress_timeline.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/viewable_image.dart';
 
 class WorkerTaskDetailPage extends StatefulWidget {
   const WorkerTaskDetailPage({super.key, required this.taskId});
@@ -30,9 +32,28 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
   final _noteController = TextEditingController();
   String? _photoPath;
   bool _isUpdating = false;
+  CollectionTask? _task;
+  bool _loading = true;
 
-  CollectionTask? get _task =>
-      AppRepository.instance.getTaskById(widget.taskId);
+  @override
+  void initState() {
+    super.initState();
+    _loadTask();
+  }
+
+  Future<void> _loadTask() async {
+    CollectionTask? task;
+    try {
+      task = await TaskService.instance.getTaskById(widget.taskId);
+    } on Object {
+      task = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _task = task;
+      _loading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -62,23 +83,31 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
 
   Future<void> _updateStatus(CollectionTaskStatus status) async {
     setState(() => _isUpdating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+    try {
+      await TaskService.instance.updateTaskStatus(
+        widget.taskId,
+        status,
+        localProofPhotoPath:
+            status == CollectionTaskStatus.completed ? _photoPath : null,
+        proofNote: status == CollectionTaskStatus.completed
+            ? (_noteController.text.trim().isEmpty
+                ? null
+                : _noteController.text.trim())
+            : null,
+      );
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not update the task: $e'),
+          backgroundColor: Colors.redAccent.shade200,
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
-
-    AppRepository.instance.updateTaskStatus(
-      widget.taskId,
-      status,
-      proofPhotoPath:
-          status == CollectionTaskStatus.completed ? _photoPath : null,
-      proofNote: status == CollectionTaskStatus.completed
-          ? (_noteController.text.trim().isEmpty
-              ? null
-              : _noteController.text.trim())
-          : null,
-    );
-
     setState(() => _isUpdating = false);
-    if (!mounted) return;
 
     if (status == CollectionTaskStatus.completed) {
       await showDialog<void>(
@@ -105,12 +134,18 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         ),
       );
     }
-    setState(() {});
+    await _loadTask();
   }
 
   @override
   Widget build(BuildContext context) {
     final task = _task;
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Task Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     if (task == null) {
       return Scaffold(
         appBar: AppBar(title: Text('Task Details')),
@@ -121,6 +156,11 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
     final isCompleted = task.status == CollectionTaskStatus.completed;
     final showProofInput =
         task.status == CollectionTaskStatus.collecting && !isCompleted;
+    // Once the Head approves the proof, the progress timeline advances past
+    // 'Collection In Progress' to 'Resolved' (the last timeline step).
+    final isResolved = isCompleted && task.reviewedByHead;
+    final progressStep =
+        isResolved ? 4 : task.status.progressStep;
 
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
@@ -133,9 +173,13 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadTask,
+          color: AppColors.primaryGreen,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppCard(
@@ -172,8 +216,10 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                   ],
                 ),
               ),
-              if (task.citizenComplaintId != null)
+              if (task.citizenComplaintId != null) ...[
+                const SizedBox(height: 16),
                 _CitizenPhotoCard(task: task),
+              ],
               const SizedBox(height: 16),
               LiveMapView(
                 height: 220,
@@ -199,7 +245,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 16),
-                    ProgressTimeline(currentStep: task.status.progressStep),
+                    ProgressTimeline(currentStep: progressStep),
                   ],
                 ),
               ),
@@ -293,15 +339,40 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                             fontSize: 12.5, color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Image.file(
-                          File(task.proofPhotoPath!),
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                      if (task.proofPhotoPath!.startsWith('http'))
+                        ViewableImage(
+                          thumbnail: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.network(
+                              task.proofPhotoPath!,
+                              height: 180,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          dialogImage: Image.network(
+                            task.proofPhotoPath!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
+                          ),
+                        )
+                      else if (File(task.proofPhotoPath!).existsSync())
+                        ViewableImage(
+                          thumbnail: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.file(
+                              File(task.proofPhotoPath!),
+                              height: 180,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          dialogImage:
+                              Image.file(File(task.proofPhotoPath!), fit: BoxFit.contain),
                         ),
-                      ),
                       if (task.proofNote != null) ...[
                         const SizedBox(height: 10),
                         Text(
@@ -339,6 +410,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
               _buildActionButtons(task),
               const SizedBox(height: 16),
             ],
+            ),
           ),
         ),
       ),
@@ -394,6 +466,18 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
           isLoading: _isUpdating,
           onPressed: () => _updateStatus(CollectionTaskStatus.assigned),
         );
+      case CollectionTaskStatus.revoked:
+        // Revoked tasks leave the worker's queue (the Head clears the worker),
+        // so this is only reachable from a stale screen.
+        return const Padding(
+          padding: EdgeInsets.all(12),
+          child: Text(
+            'This task was revoked by your Head and is no longer assigned to you.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: Colors.redAccent, fontWeight: FontWeight.w600),
+          ),
+        );
     }
   }
 
@@ -406,22 +490,41 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
 }
 
 /// Shows the citizen's reported photo for tasks created from a citizen
-/// complaint, so the worker can see exactly what was reported.
-class _CitizenPhotoCard extends StatelessWidget {
+/// complaint, so the worker can see exactly what was reported. Fetched from
+/// Supabase so the URL works on the worker's device.
+class _CitizenPhotoCard extends StatefulWidget {
   const _CitizenPhotoCard({required this.task});
 
   final CollectionTask task;
 
   @override
+  State<_CitizenPhotoCard> createState() => _CitizenPhotoCardState();
+}
+
+class _CitizenPhotoCardState extends State<_CitizenPhotoCard> {
+  Complaint? _complaint;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.task.citizenComplaintId;
+    if (id != null) {
+      ComplaintService.instance.getComplaintById(id).then((complaint) {
+        if (mounted) setState(() => _complaint = complaint);
+      }).catchError((_) {
+        if (mounted) setState(() => _complaint = null);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final complaint = task.citizenComplaintId == null
-        ? null
-        : MockDataRepository.instance
-            .getComplaintById(task.citizenComplaintId!);
+    final complaint = _complaint;
     if (complaint == null) return const SizedBox.shrink();
 
     final path = complaint.photoPath;
-    final hasPhoto = path != null && File(path).existsSync();
+    final isUrl = path != null &&
+        (path.startsWith('http://') || path.startsWith('https://'));
 
     return AppCard(
       child: Column(
@@ -434,26 +537,38 @@ class _CitizenPhotoCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Citizen Reported — #${complaint.id}',
+                  'Citizen Reported — #${complaint.displayId}',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
             ],
           ),
+          if (complaint.citizenId != null) ...[
+            const SizedBox(height: 4),
+            CitizenContactBar(citizenId: complaint.citizenId!),
+          ],
           const SizedBox(height: 4),
           Text(
             '${complaint.category} · ${complaint.location}',
             style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 10),
-          if (hasPhoto)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(path!),
-                height: 160,
-                width: double.infinity,
-                fit: BoxFit.cover,
+          if (isUrl)
+            ViewableImage(
+              thumbnail: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  path!,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+              dialogImage: Image.network(
+                path!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             )
           else

@@ -28,7 +28,9 @@ class MapPlaceholder extends StatelessWidget {
       height: height,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
+        color: AppColors.isDark
+            ? const Color(0xFF1B231E)
+            : const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.borderColor),
       ),
@@ -46,7 +48,7 @@ class MapPlaceholder extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.92),
+                  color: AppColors.cardColor.withOpacity(0.92),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -120,7 +122,7 @@ class MapPlaceholder extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: AppColors.cardColor.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -183,7 +185,7 @@ class _MapMarker extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardColor,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -218,7 +220,7 @@ class _MapDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: AppColors.cardColor, width: 2),
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/app_theme.dart';
+
 class CustomTextField extends StatefulWidget {
   const CustomTextField({
     super.key,
@@ -55,10 +57,10 @@ class _CustomTextFieldState extends State<CustomTextField> {
       children: [
         Text(
           widget.label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -77,7 +79,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
             hintText: widget.hint ?? widget.label,
             prefixIcon: widget.prefixIcon != null
                 ? Icon(widget.prefixIcon,
-                    size: 22, color: const Color(0xFF2E7D32))
+                    size: 22, color: AppColors.primaryGreen)
                 : null,
             suffixIcon: widget.enablePasswordToggle
                 ? IconButton(
@@ -85,7 +87,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
                       _obscureText
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: const Color(0xFF616161),
+                      color: AppColors.textSecondary,
                     ),
                     onPressed: () =>
                         setState(() => _obscureText = !_obscureText),

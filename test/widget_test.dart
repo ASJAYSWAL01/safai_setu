@@ -1,188 +1,120 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:safai_setu/data/app_repository.dart';
-import 'package:safai_setu/data/mock_data_repository.dart';
-import 'package:safai_setu/main.dart';
-import 'package:safai_setu/services/auth_service.dart';
+import 'package:safai_setu/models/complaint.dart';
+import 'package:safai_setu/models/user.dart';
+import 'package:safai_setu/models/user_profile.dart';
+import 'package:safai_setu/screens/login_page.dart';
 import 'package:safai_setu/services/theme_service.dart';
 import 'package:safai_setu/theme/app_theme.dart';
 
 void main() {
-  testWidgets('Role select page renders with all three portals', (WidgetTester tester) async {
-    await tester.pumpWidget(const SafaiSetuApp());
+  group('AppUser role gating', () {
+    test('roles gate which shell each user may access', () {
+      const citizen = AppUser(
+        id: 'u1',
+        name: 'Citizen',
+        email: 'citizen@example.com',
+        role: UserRole.citizen,
+      );
+      const worker = AppUser(
+        id: 'u2',
+        name: 'Worker',
+        email: 'worker@example.com',
+        role: UserRole.worker,
+      );
+      const head = AppUser(
+        id: 'u3',
+        name: 'Head',
+        email: 'head@example.com',
+        role: UserRole.head,
+      );
 
-    expect(find.text('Safai Setu'), findsOneWidget);
-    expect(find.text('Who are you?'), findsOneWidget);
-    expect(find.text('Citizen'), findsOneWidget);
-    expect(find.text('Worker'), findsOneWidget);
-    expect(find.text('Head'), findsOneWidget);
+      expect(citizen.isCitizen, isTrue);
+      expect(citizen.isWorker, isFalse);
+      expect(citizen.isHead, isFalse);
+      expect(worker.isWorker, isTrue);
+      expect(head.isHead, isTrue);
+    });
+
+    test('UserProfile.fromJson parses database rows safely', () {
+      final profile = UserProfile.fromJson({
+        'id': 'abc-123',
+        'full_name': 'Aarav Patel',
+        'email': 'aarav@example.com',
+        'avatar_url': 'https://example.com/avatar.png',
+        'role': 'worker',
+        'phone': '9876543210',
+        'worker_id': 'WK-1001',
+        'vehicle_number': 'GJ-18-WM-1024',
+        'created_at': '2026-01-01T10:00:00.000Z',
+        'updated_at': '2026-01-02T10:00:00.000Z',
+      });
+
+      expect(profile.fullName, 'Aarav Patel');
+      expect(profile.email, 'aarav@example.com');
+      expect(profile.role, UserRole.worker);
+      expect(profile.workerId, 'WK-1001');
+      expect(profile.avatarUrl, 'https://example.com/avatar.png');
+      expect(profile.createdAt, isNotNull);
+
+      // Missing/unknown fields must not crash.
+      final minimal = UserProfile.fromJson({'id': 'x', 'full_name': ''});
+      expect(minimal.role, UserRole.citizen);
+      expect(minimal.fullName, isNotEmpty);
+      expect(minimal.email, '');
+      expect(minimal.avatarUrl, isNull);
+
+      // A database row can never create a head/worker without a real role.
+      expect(UserProfile.fromJson({'id': 'y', 'role': 'head'}).role,
+          UserRole.head);
+      expect(
+          UserProfile.fromJson({'id': 'z', 'role': 'not-a-role'}).role,
+          UserRole.citizen);
+    });
   });
 
-  test('Citizen cannot login on the Head portal', () {
-    final error = AuthService.instance.loginHead(
-      identifier: 'citizen@safaisetu.in',
-      password: 'citizen123',
-    );
-    expect(error, isNotNull);
-    expect(error, contains('not authorized as Head'));
-    expect(AuthService.instance.user, isNull);
+  group('Complaint model', () {
+    test('status strings map to enum values', () {
+      expect(ComplaintStatus.values, hasLength(5));
+      expect(ComplaintStatus.pending.label, 'Pending');
+      expect(ComplaintStatus.resolved.label, 'Resolved');
+      expect(ComplaintStatus.rejected.label, 'Rejected');
+    });
   });
 
-  test('Worker cannot login on the Head portal', () {
-    final error = AuthService.instance.loginHead(
-      identifier: 'ramesh.worker@safaisetu.in',
-      password: 'worker123',
-    );
-    expect(error, isNotNull);
-    expect(error, contains('not authorized as Head'));
-    expect(AuthService.instance.user, isNull);
+  group('Login page', () {
+    testWidgets('shows the Google sign-in button and Safai Setu branding',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: LoginPage()),
+      );
+
+      expect(find.text('Welcome to Safai Setu'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsOneWidget);
+    });
   });
 
-  test('Worker logs in with Worker ID, not email', () {
-    final error = AuthService.instance.loginWorker(
-      workerId: 'WK-1001',
-      password: 'worker123',
-    );
-    expect(error, isNull);
-    expect(AuthService.instance.user?.isWorker, isTrue);
-    AuthService.instance.logout();
-  });
+  group('Theme', () {
+    test('theme toggle switches the app palette between light and dark', () {
+      // Reset to light first.
+      ThemeService.instance.setDark(false);
+      expect(ThemeService.instance.darkMode, isFalse);
+      expect(AppColors.isDark, isFalse);
 
-  test('Head logs in with Head credentials and gets full access', () {
-    final error = AuthService.instance.loginHead(
-      identifier: 'head@safaisetu.in',
-      password: 'head123',
-    );
-    expect(error, isNull);
-    expect(AuthService.instance.user?.isHead, isTrue);
-    AuthService.instance.logout();
-  });
+      ThemeService.instance.setDark(true);
+      expect(ThemeService.instance.darkMode, isTrue);
 
-  test('Head generates Worker IDs — citizens cannot', () {
-    // Citizen cannot generate.
-    AuthService.instance.loginCitizen(
-      emailOrMobile: 'citizen@safaisetu.in',
-      password: 'citizen123',
-    );
-    final asCitizen = AuthService.instance.registerWorker(
-      name: 'Test Worker',
-      phone: '9876500099',
-      vehicleNumber: 'GJ-18-WM-9999',
-    );
-    expect(asCitizen, isNull);
+      // The palette getters must flip with the flag.
+      AppColors.isDark = true;
+      expect(AppColors.mintBackground, isNot(const Color(0xFFF1F8F4)));
+      expect(AppColors.textPrimary, isNot(const Color(0xFF1A1A1A)));
 
-    // Head can generate.
-    AuthService.instance.logout();
-    AuthService.instance.loginHead(
-      identifier: 'head@safaisetu.in',
-      password: 'head123',
-    );
-    final asHead = AuthService.instance.registerWorker(
-      name: 'New Worker',
-      phone: '9876500098',
-      vehicleNumber: 'GJ-18-WM-9998',
-    );
-    expect(asHead, isNotNull);
-    expect(asHead!.workerId, startsWith('WK-'));
-    AuthService.instance.logout();
-  });
-
-  test('Head can edit a worker profile; Worker ID stays unchanged', () {
-    AuthService.instance.loginHead(
-      identifier: 'head@safaisetu.in',
-      password: 'head123',
-    );
-    final before = AuthService.instance.getWorkerByWorkerId('WK-1001');
-    final error = AuthService.instance.updateWorker(
-      id: before!.id,
-      name: 'Ramesh Kumar Updated',
-      phone: '9876500999',
-      vehicleNumber: 'GJ-18-WM-7777',
-    );
-    expect(error, isNull);
-
-    final after = AuthService.instance.getWorkerByWorkerId('WK-1001');
-    expect(after!.name, 'Ramesh Kumar Updated');
-    expect(after.vehicleNumber, 'GJ-18-WM-7777');
-    expect(after.workerId, 'WK-1001'); // Worker ID never changes
-    AuthService.instance.logout();
-  });
-
-  test('Head can delete a worker; tasks unassigned and live location cleared', () {
-    AuthService.instance.loginHead(
-      identifier: 'head@safaisetu.in',
-      password: 'head123',
-    );
-    final worker = AuthService.instance.getWorkerByWorkerId('WK-1002');
-    expect(worker, isNotNull);
-
-    // Worker shared a live location first.
-    AppRepository.instance.updateWorkerLocation('WK-1002', 23.21, 72.63);
-    expect(AppRepository.instance.lastLocation('WK-1002'), isNotNull);
-
-    final error = AuthService.instance.deleteWorker(worker!.id);
-    expect(error, isNull);
-    expect(AuthService.instance.getWorkerByWorkerId('WK-1002'), isNull);
-
-    // WK-1002 had task T-2003 — it must now be unassigned.
-    final task = AppRepository.instance.getTaskById('T-2003');
-    expect(task!.workerId, isNull);
-
-    // No stale live location should remain after deleting the worker.
-    expect(AppRepository.instance.lastLocation('WK-1002'), isNull);
-    AuthService.instance.logout();
-  });
-
-  test('Theme toggle switches the app palette between light and dark', () {
-    // Reset to light first.
-    ThemeService.instance.setDark(false);
-    expect(ThemeService.instance.darkMode, isFalse);
-    expect(AppColors.isDark, isFalse);
-
-    ThemeService.instance.setDark(true);
-    expect(ThemeService.instance.darkMode, isTrue);
-
-    // The palette getters must flip with the flag.
-    AppColors.isDark = true;
-    expect(AppColors.mintBackground, isNot(const Color(0xFFF1F8F4)));
-    expect(AppColors.textPrimary, isNot(const Color(0xFF1A1A1A)));
-
-    // And back.
-    ThemeService.instance.setDark(false);
-    AppColors.isDark = false;
-    expect(AppColors.mintBackground, const Color(0xFFF1F8F4));
-  });
-
-  test('Citizen complaint keeps its photo path for worker and head', () {
-    final complaint = MockDataRepository.instance.addComplaint(
-      category: 'Plastic Waste',
-      description: 'Plastic dumped near the market.',
-      location: 'Lat: 23.2070, Long: 72.6510',
-      hasPhoto: true,
-      photoPath: 'C:/demo/waste_photo.jpg',
-      latitude: 23.2070,
-      longitude: 72.6510,
-    );
-    expect(complaint.id, isNot('SS1024')); // unique ID
-    expect(complaint.photoPath, 'C:/demo/waste_photo.jpg');
-    expect(complaint.latitude, 23.2070);
-
-    // A task created from this complaint carries the link to the head/worker.
-    final task = AppRepository.instance.addTask(
-      title: complaint.category,
-      description: complaint.description,
-      latitude: complaint.latitude!,
-      longitude: complaint.longitude!,
-      workerId: 'WK-1001',
-      citizenComplaintId: complaint.id,
-    );
-    expect(task.citizenComplaintId, complaint.id);
-    expect(
-      MockDataRepository.instance
-          .getComplaintById(task.citizenComplaintId!)!
-          .photoPath,
-      'C:/demo/waste_photo.jpg',
-    );
+      // And back.
+      ThemeService.instance.setDark(false);
+      AppColors.isDark = false;
+      expect(AppColors.mintBackground, const Color(0xFFF1F8F4));
+    });
   });
 }

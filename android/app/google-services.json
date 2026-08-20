@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "95687672120",
+    "project_id": "safaisetu001",
+    "storage_bucket": "safaisetu001.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:95687672120:android:b59778f3c6c6b4172901cd",
+        "android_client_info": {
+          "package_name": "com.safaisetu.safai_setu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHYVXB14Wte_BDi3RoQMzMRcpl89xA8n4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../utils/validators.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/custom_button.dart';
@@ -18,6 +18,7 @@ class HeadGenerateWorkerIdPage extends StatefulWidget {
 
 class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
   final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _vehicleController = TextEditingController();
@@ -25,6 +26,7 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
 
   @override
   void dispose() {
+    _emailController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _vehicleController.dispose();
@@ -34,10 +36,9 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
   Future<void> _generate() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isGenerating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
 
-    final AppUser? worker = AuthService.instance.registerWorker(
+    final result = await AuthService.instance.registerWorker(
+      email: _emailController.text.trim(),
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       vehicleNumber: _vehicleController.text.trim().toUpperCase(),
@@ -46,9 +47,24 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
     setState(() => _isGenerating = false);
     if (!mounted) return;
 
+    if (result.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error!),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OK',
+            onPressed: () => ScaffoldMessenger.of(context)
+                .hideCurrentSnackBar(),
+          ),
+        ),
+      );
+      return;
+    }
+    final worker = result.worker;
     if (worker == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the Head can generate Worker IDs.')),
+        const SnackBar(content: Text('Could not generate Worker ID.')),
       );
       return;
     }
@@ -69,16 +85,14 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Share these credentials with the worker:'),
+            const Text('Worker promoted. Share these details:'),
             const SizedBox(height: 14),
             _CredentialRow(label: 'Worker ID', value: worker.workerId!),
-            const SizedBox(height: 8),
-            _CredentialRow(label: 'Default Password', value: 'worker123'),
             const SizedBox(height: 8),
             _CredentialRow(label: 'Vehicle', value: worker.vehicleNumber!),
             const SizedBox(height: 14),
             Text(
-              'The worker logs in from the "Worker" portal on the login page using this Worker ID.',
+              'The worker signs in with their email and password in the Login screen and is automatically granted worker access with this Worker ID.',
               style: TextStyle(
                   fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
             ),
@@ -94,6 +108,7 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
     );
 
     if (!mounted) return;
+    _emailController.clear();
     _nameController.clear();
     _phoneController.clear();
     _vehicleController.clear();
@@ -136,7 +151,7 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Only the Head can register pickup-truck workers. A unique Worker ID (WK-XXXX) is generated automatically — the worker uses it to login.',
+                          'Only the Head can register pickup-truck workers. Enter the email of the worker account created in Supabase Authentication (Authentication → Users → Add user). A unique Worker ID (WK-XXXX) is generated automatically and their profile role becomes Worker. The worker then signs in with that email and password.',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textPrimary,
@@ -152,6 +167,17 @@ class _HeadGenerateWorkerIdPageState extends State<HeadGenerateWorkerIdPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      CustomTextField(
+                        controller: _emailController,
+                        label: 'Worker Email',
+                        hint: 'Email of the worker account created in Supabase',
+                        prefixIcon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autocorrect: false,
+                        validator: Validators.email,
+                      ),
+                      const SizedBox(height: 16),
                       CustomTextField(
                         controller: _nameController,
                         label: 'Worker Full Name',

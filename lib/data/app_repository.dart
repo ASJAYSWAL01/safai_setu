@@ -232,7 +232,6 @@ class AppRepository {
       {int points = 6}) {
     final random = Random(destLat.toInt() * 31 + destLng.toInt());
     return List.generate(points, (i) {
-      final offset = 0.004 * (i + 1);
       final wobble = (random.nextDouble() - 0.5) * 0.002;
       return WorkerLocation(
         latitude: _baseLat + (destLat - _baseLat) * ((i + 1) / points) + wobble,

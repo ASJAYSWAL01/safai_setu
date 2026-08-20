@@ -1,16 +1,44 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- Google Maps API key — replace with your key (keep in sync with lib/utils/config.dart) -->
-    <meta-data
-      android:name="com.google.android.geo.API_KEY"
-      android:value="" />
+    <!-- Push notifications (FCM) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
-        android:label="safai_setu"
+        android:label="Safai Setu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Google Maps API key is injected from android/google_maps.properties
+             (GOOGLE_MAPS_ANDROID_API_KEY) via Gradle manifestPlaceholders.
+             MUST be inside <application> — the Maps SDK reads it from the
+             application context. See build.gradle(.kts). -->
+        <meta-data
+          android:name="com.google.android.geo.API_KEY"
+          android:value="${GOOGLE_MAPS_ANDROID_API_KEY}" />
+        <!-- Push notifications (FCM) default channel + small icon -->
+        <meta-data
+          android:name="com.google.firebase.messaging.default_notification_channel_id"
+          android:value="safai_setu_notifications" />
+        <meta-data
+          android:name="com.google.firebase.messaging.default_notification_icon"
+          android:resource="@drawable/ic_notification" />
+        <!-- flutter_local_notifications: show notifications while app is open -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"

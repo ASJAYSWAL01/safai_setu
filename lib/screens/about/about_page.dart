@@ -132,12 +132,16 @@ class AboutPage extends StatelessWidget {
                     const SizedBox(height: 10),
                     const _FeatureRow(
                         icon: Icons.email_outlined,
-                        label: 'support@safaisetu.in'),
+                        label: 'tech.safaisetu@gmail.com'),
                     const _FeatureRow(
-                        icon: Icons.phone_outlined, label: '+91 98765 00000'),
+                        icon: Icons.phone_outlined,
+                        label: '+91-7283881430'),
+                    const _FeatureRow(
+                        icon: Icons.phone_outlined,
+                        label: '+91-6355413255'),
                     const _FeatureRow(
                         icon: Icons.location_on_outlined,
-                        label: 'Gandhinagar, Gujarat, India'),
+                        label: 'LDRP Institute of Technology and Research, Sector 15, Gandhinagar, Gujarat 382016'),
                   ],
                 ),
               ),

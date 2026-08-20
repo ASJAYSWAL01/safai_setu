@@ -1,4 +1,4 @@
-enum CollectionTaskStatus { assigned, enRoute, collecting, completed, rejected }
+enum CollectionTaskStatus { assigned, enRoute, collecting, completed, rejected, revoked }
 
 extension CollectionTaskStatusX on CollectionTaskStatus {
   String get label {
@@ -13,21 +13,25 @@ extension CollectionTaskStatusX on CollectionTaskStatus {
         return 'Completed';
       case CollectionTaskStatus.rejected:
         return 'Rejected';
+      case CollectionTaskStatus.revoked:
+        return 'Revoked';
     }
   }
 
+  /// Maps the task status onto the shared complaint timeline
+  /// (0 Submitted, 1 Verified, 2 Worker Assigned, 3 Collection In Progress,
+  /// 4 Resolved). Completed only reaches 4 once the Head approves (handled
+  /// in the UI via `reviewedByHead`).
   int get progressStep {
     switch (this) {
       case CollectionTaskStatus.assigned:
-        return 0;
       case CollectionTaskStatus.enRoute:
-        return 1;
-      case CollectionTaskStatus.collecting:
+      case CollectionTaskStatus.rejected:
+      case CollectionTaskStatus.revoked:
         return 2;
+      case CollectionTaskStatus.collecting:
       case CollectionTaskStatus.completed:
         return 3;
-      case CollectionTaskStatus.rejected:
-        return 0;
     }
   }
 }
@@ -93,5 +97,75 @@ class CollectionTask {
       proofNote: proofNote ?? this.proofNote,
       reviewedByHead: reviewedByHead ?? this.reviewedByHead,
     );
+  }
+
+  factory CollectionTask.fromJson(Map<String, dynamic> json) {
+    return CollectionTask(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      description: (json['description'] as String?) ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+      workerId: json['worker_id'] as String?,
+      citizenComplaintId: json['citizen_complaint_id'] as String?,
+      assignedAt: DateTime.parse(json['assigned_at'] as String),
+      status: statusFromString(json['status'] as String?),
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'] as String)
+          : null,
+      proofPhotoPath: json['proof_photo_url'] as String?,
+      proofNote: json['proof_note'] as String?,
+      reviewedByHead: (json['reviewed_by_head'] as bool?) ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'latitude': latitude,
+        'longitude': longitude,
+        'worker_id': workerId,
+        'citizen_complaint_id': citizenComplaintId,
+        'assigned_at': assignedAt.toUtc().toIso8601String(),
+        'status': statusToDb(status),
+        'completed_at': completedAt?.toUtc().toIso8601String(),
+        'proof_photo_url': proofPhotoPath,
+        'proof_note': proofNote,
+        'reviewed_by_head': reviewedByHead,
+      };
+
+  static CollectionTaskStatus statusFromString(String? value) {
+    switch (value) {
+      case 'en_route':
+        return CollectionTaskStatus.enRoute;
+      case 'collecting':
+        return CollectionTaskStatus.collecting;
+      case 'completed':
+        return CollectionTaskStatus.completed;
+      case 'rejected':
+        return CollectionTaskStatus.rejected;
+      case 'revoked':
+        return CollectionTaskStatus.revoked;
+      default:
+        return CollectionTaskStatus.assigned;
+    }
+  }
+
+  static String statusToDb(CollectionTaskStatus status) {
+    switch (status) {
+      case CollectionTaskStatus.assigned:
+        return 'assigned';
+      case CollectionTaskStatus.enRoute:
+        return 'en_route';
+      case CollectionTaskStatus.collecting:
+        return 'collecting';
+      case CollectionTaskStatus.completed:
+        return 'completed';
+      case CollectionTaskStatus.rejected:
+        return 'rejected';
+      case CollectionTaskStatus.revoked:
+        return 'revoked';
+    }
   }
 }

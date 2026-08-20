@@ -36,8 +36,20 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   image_picker: ^1.1.2
-  geolocator: ^11.0.2
+  geolocator: ^14.0.3
   supabase_flutter: ^2.15.4
+  google_maps_flutter: ^2.10.1
+  google_sign_in: ^7.2.0
+  url_launcher: ^6.3.2
+  webview_flutter: ^4.14.1
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
+  flutter_local_notifications: ^22.3.0
+  shared_preferences: ^2.5.5
+  font_awesome_flutter: ^11.0.0
+  flutter_localizations:
+    sdk: flutter
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -48,12 +60,8 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^4.0.0
-
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 flutter:
 
   # The following line ensures that the Material Icons font is
@@ -63,12 +71,31 @@ flutter:
 
   assets:
     - assets/images/safai_setu_mascot.png
+    - assets/images/google_g.svg
+    - assets/images/assistant_ashish.png
+    - assets/images/assistant_het.jpg
+    - assets/images/assistant_hrisit.jpg
+    - assets/images/assistant_nihar.jpg
+    - assets/images/assistant_harsh.jpg
+    - assets/images/assistant_preeyanshi.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
+
+# App icon (launcher icon) — generated from assets/images/safai_setu_logo_icon.png
+# (a cropped 1024x1024 version of assets/images/safai_setu_logo.png that fills the icon).
+# After updating the logo, regenerate the cropped source and icons with:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: assets/images/safai_setu_logo_padded.png
+  adaptive_icon_background: "#FFFFFF"
+  min_sdk_android: 21
 
   # To add custom fonts to your application, add a fonts section here,
   # in this "flutter" section. Each entry in this list should have a

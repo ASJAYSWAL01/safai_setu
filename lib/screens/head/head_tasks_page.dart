@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
-import '../../data/app_repository.dart';
-import '../../data/mock_data_repository.dart';
 import '../../models/collection_task.dart';
-import '../../models/complaint.dart';
+import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/complaint_service.dart';
+import '../../services/task_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/status_badge.dart';
@@ -25,6 +23,57 @@ class HeadTasksPage extends StatefulWidget {
 
 class _HeadTasksPageState extends State<HeadTasksPage> {
   late String _filter = widget.initialFilter;
+  Map<String, AppUser> _workersById = {};
+
+  /// Complaint UUID -> short display number (e.g. SS-260815-001), so task
+  /// cards show a small ID instead of the raw UUID.
+  Map<String, String> _complaintNumbers = {};
+  List<CollectionTask> _tasks = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    List<AppUser> workers;
+    try {
+      workers = await AuthService.instance.workers;
+    } on Object {
+      workers = [];
+    }
+    List<CollectionTask> tasks;
+    try {
+      tasks = await TaskService.instance.fetchAllTasks();
+    } on Object {
+      tasks = [];
+    }
+    List<dynamic> complaints;
+    try {
+      complaints = await ComplaintService.instance.fetchAllComplaints();
+    } on Object {
+      complaints = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _workersById = {
+        for (final w in workers)
+          if (w.workerId != null) w.workerId!: w,
+      };
+      _complaintNumbers = {
+        for (final c in complaints) c.id: c.displayId,
+      };
+      _tasks = tasks;
+      _loading = false;
+    });
+  }
+
+  String _complaintNumber(String? complaintId) {
+    if (complaintId == null) return '';
+    return _complaintNumbers[complaintId] ?? complaintId;
+  }
 
   static const _filters = [
     'All',
@@ -33,24 +82,72 @@ class _HeadTasksPageState extends State<HeadTasksPage> {
     'Collecting',
     'Completed',
     'Rejected',
+    'Revoked',
   ];
 
-  List<CollectionTask> get _tasks {
-    final all = AppRepository.instance.tasks;
+  List<CollectionTask> get _filteredTasks {
+    final all = _tasks;
     if (_filter == 'All') return all;
     return all.where((t) => t.status.label == _filter).toList();
   }
 
   String _workerName(String? workerId) {
     if (workerId == null) return 'Unassigned';
-    final worker = AuthService.instance.getWorkerByWorkerId(workerId);
+    final worker = _workersById[workerId];
     return worker == null ? 'Worker $workerId' : worker.name;
+  }
+
+  Future<void> _revokeTask(BuildContext context, CollectionTask task) async {
+    final workerName = _workerName(task.workerId);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Revoke Task?'),
+        content: Text(
+          'Revoke this task from $workerName?\n\n'
+          'It will be removed from the worker\'s queue and the citizen complaint '
+          'returns to the unassigned state, so you can assign it to another '
+          'worker.\n\nThis is only possible while the worker hasn\'t started '
+          '(status: Assigned).',
+          style: TextStyle(
+              fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Revoke'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await TaskService.instance.revokeTask(task.id);
+    } on Object catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not revoke the task: $e'),
+          backgroundColor: Colors.redAccent.shade200,
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Task revoked. It can be assigned to another worker.')),
+    );
+    await _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
-    final tasks = _tasks;
-
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
       appBar: AppBar(
@@ -96,7 +193,11 @@ class _HeadTasksPageState extends State<HeadTasksPage> {
                     labelStyle: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: selected ? Colors.white : AppColors.textSecondary,
+                      color: selected
+                          ? (AppColors.isDark
+                              ? const Color(0xFF111511)
+                              : Colors.white)
+                          : AppColors.textSecondary,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
@@ -106,20 +207,25 @@ class _HeadTasksPageState extends State<HeadTasksPage> {
               ),
             ),
             Expanded(
-              child: tasks.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No tasks in this status yet.',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: tasks.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) =>
-                          _buildTaskCard(context, tasks[index]),
-                    ),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredTasks.isEmpty
+                      ? Center(
+                          child: Text(
+                            _tasks.isEmpty
+                                ? 'No tasks yet. Tap + to create and assign the first task.'
+                                : 'No tasks in this status yet.',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: _filteredTasks.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) =>
+                              _buildTaskCard(context, _filteredTasks[index]),
+                        ),
             ),
           ],
         ),
@@ -129,10 +235,6 @@ class _HeadTasksPageState extends State<HeadTasksPage> {
 
   Widget _buildTaskCard(BuildContext context, CollectionTask task) {
     final isUnassigned = task.workerId == null;
-    final linkedComplaint = task.citizenComplaintId == null
-        ? null
-        : MockDataRepository.instance
-            .getComplaintById(task.citizenComplaintId!);
 
     return AppCard(
       child: Column(
@@ -157,9 +259,26 @@ class _HeadTasksPageState extends State<HeadTasksPage> {
             style: TextStyle(
                 fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
           ),
-          if (linkedComplaint != null) ...[
+          if (task.citizenComplaintId != null) ...[
             const SizedBox(height: 8),
-            _LinkedComplaintRow(complaint: linkedComplaint),
+            Row(
+              children: [
+                const Icon(Icons.contact_support_outlined,
+                    size: 15, color: Color(0xFF00838F)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Resolves citizen complaint '
+                    '#${_complaintNumber(task.citizenComplaintId)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF00838F),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
           const SizedBox(height: 10),
           Row(
@@ -233,85 +352,27 @@ class _HeadTasksPageState extends State<HeadTasksPage> {
               ),
             ),
           ],
+          if (!isUnassigned &&
+              task.status == CollectionTaskStatus.assigned) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _revokeTask(context, task),
+                icon: const Icon(Icons.undo_rounded, size: 18),
+                label: const Text('Revoke Task'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  side: const BorderSide(color: Colors.redAccent),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Compact row showing the citizen complaint a task resolves, including a
-/// thumbnail of the citizen's reported photo when available.
-class _LinkedComplaintRow extends StatelessWidget {
-  const _LinkedComplaintRow({required this.complaint});
-
-  final Complaint complaint;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = complaint.photoPath;
-    final hasPhoto = path != null && File(path).existsSync();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF00838F).withOpacity(0.06),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          if (hasPhoto)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                File(path!),
-                width: 56,
-                height: 56,
-                fit: BoxFit.cover,
-              ),
-            )
-          else
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.cardColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                complaint.hasPhoto
-                    ? Icons.image_not_supported_outlined
-                    : Icons.photo_camera_outlined,
-                size: 20,
-                color: AppColors.textSecondary.withOpacity(0.7),
-              ),
-            ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Citizen complaint #${complaint.id}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF00838F),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${complaint.category} · ${complaint.location}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style:
-                      TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

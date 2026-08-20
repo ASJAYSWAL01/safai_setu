@@ -1,27 +1,120 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../data/app_repository.dart';
 import '../../models/collection_task.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/location_service.dart';
+import '../../services/task_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/call_utils.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/live_map_view.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/worker_avatar.dart';
 import 'head_assign_task_page.dart';
 import 'head_edit_worker_page.dart';
 
-class HeadWorkerDetailPage extends StatelessWidget {
+class HeadWorkerDetailPage extends StatefulWidget {
   const HeadWorkerDetailPage({super.key, required this.workerId});
 
   final String workerId;
 
-  AppUser? get _worker {
-    for (final account in AuthService.instance.workers) {
-      if (account.id == workerId) return account;
+  @override
+  State<HeadWorkerDetailPage> createState() => _HeadWorkerDetailPageState();
+}
+
+class _HeadWorkerDetailPageState extends State<HeadWorkerDetailPage> {
+  AppUser? _worker;
+  List<CollectionTask> _tasks = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorker();
+  }
+
+  Future<void> _loadWorker() async {
+    List<AppUser> workers;
+    try {
+      workers = await AuthService.instance.workers;
+    } on Object {
+      workers = [];
     }
-    return null;
+    if (!mounted) return;
+    AppUser? found;
+    for (final account in workers) {
+      if (account.id == widget.workerId) {
+        found = account;
+        break;
+      }
+    }
+    List<CollectionTask> tasks = [];
+    final workerId = found?.workerId;
+    if (workerId != null) {
+      try {
+        tasks = await TaskService.instance.fetchTasksForWorker(workerId);
+      } on Object {
+        tasks = [];
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _worker = found;
+      _tasks = tasks;
+      _loading = false;
+    });
+  }
+
+  Future<void> _revokeTask(
+      BuildContext context, CollectionTask task) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Revoke Task?'),
+        content: Text(
+          'Revoke "${task.title}" from this worker?\n\n'
+          'It will be removed from the worker\'s queue and the citizen complaint '
+          'returns to the unassigned state, so you can assign it to another '
+          'worker.',
+          style: TextStyle(
+              fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Revoke'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await TaskService.instance.revokeTask(task.id);
+    } on Object catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not revoke the task: $e'),
+          backgroundColor: Colors.redAccent.shade200,
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Task revoked.')),
+    );
+    await _loadWorker();
   }
 
   Future<void> _editWorker(BuildContext context, AppUser worker) async {
@@ -30,6 +123,7 @@ class HeadWorkerDetailPage extends StatelessWidget {
         builder: (_) => HeadEditWorkerPage(workerId: worker.id),
       ),
     );
+    if (mounted) _loadWorker();
   }
 
   Future<void> _deleteWorker(BuildContext context, AppUser worker) async {
@@ -55,11 +149,20 @@ class HeadWorkerDetailPage extends StatelessWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    final error = AuthService.instance.deleteWorker(worker.id);
+    final error = await AuthService.instance.deleteWorker(worker.id);
+    if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
       return;
+    }
+    final workerId = worker.workerId;
+    if (workerId != null) {
+      try {
+        await LocationService.instance.clearLocation(workerId);
+      } on Object catch (e) {
+        debugPrint('Failed to clear location for $workerId: $e');
+      }
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${worker.name} deleted.')),
@@ -69,16 +172,22 @@ class HeadWorkerDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Worker')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     final worker = _worker;
     if (worker == null) {
       return Scaffold(
-        appBar: AppBar(title: Text('Worker')),
+        appBar: AppBar(title: const Text('Worker')),
         body: const Center(child: Text('Worker not found')),
       );
     }
 
-    final tasks = AppRepository.instance.tasksForWorker(worker.workerId!);
-    final location = AppRepository.instance.lastLocation(worker.workerId!);
+    final tasks = _tasks;
+    final workerId = worker.workerId;
     final completed =
         tasks.where((t) => t.status == CollectionTaskStatus.completed).length;
 
@@ -92,6 +201,13 @@ class HeadWorkerDetailPage extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
+          if (worker.phone?.trim().isNotEmpty == true)
+            IconButton(
+              tooltip: 'Call ${worker.name}',
+              icon: const Icon(Icons.call_outlined, color: Color(0xFF1565C0)),
+              onPressed: () =>
+                  callPhoneNumber(context, phone: worker.phone!),
+            ),
           PopupMenuButton<String>(
             tooltip: 'Worker actions',
             onSelected: (value) {
@@ -130,17 +246,11 @@ class HeadWorkerDetailPage extends StatelessWidget {
               AppCard(
                 child: Column(
                   children: [
-                    CircleAvatar(
+                    WorkerAvatar(
+                      name: worker.name,
+                      photoUrl: worker.photoUrl,
                       radius: 36,
-                      backgroundColor: const Color(0xFF6A1B9A).withOpacity(0.1),
-                      child: Text(
-                        worker.name[0],
-                        style: TextStyle(
-                          color: Color(0xFF6A1B9A),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 28,
-                        ),
-                      ),
+                      accent: const Color(0xFF6A1B9A),
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -168,84 +278,19 @@ class HeadWorkerDetailPage extends StatelessWidget {
                       label: 'Tasks Done',
                       value: '$completed of ${tasks.length} completed',
                     ),
+                    if (workerId == null) ...[
+                      const Divider(height: 18),
+                      const _InfoRow(
+                        label: 'Note',
+                        value:
+                            'No Worker ID yet — generate one from the Workers page to assign tasks.',
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          location == null ? Icons.sensors_off : Icons.sensors,
-                          size: 18,
-                          color: location == null
-                              ? AppColors.textSecondary
-                              : AppColors.primaryGreen,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          location == null
-                              ? 'No live location shared yet'
-                              : 'Live Location',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        const Spacer(),
-                        if (location != null)
-                          Text(
-                            'Updated ${_formatTime(location.updatedAt)}',
-                            style: TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (location != null)
-                      LiveMapView(
-                        height: 220,
-                        title: 'Worker Live Location',
-                        center: LatLng(location.latitude, location.longitude),
-                        markers: [
-                          LiveMapMarker(
-                            LatLng(location.latitude, location.longitude),
-                            label: '${worker.name} (${worker.workerId})',
-                            icon: Icons.local_shipping,
-                            color: const Color(0xFF6A1B9A),
-                          ),
-                        ],
-                        showUserLocation: false,
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'The worker\'s live GPS position appears here when they enable location sharing in their app.',
-                          style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                              height: 1.4),
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                    if (location != null)
-                      Text(
-                        'Coordinates: ${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryGreen,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+              _LiveLocationCard(workerId: worker.workerId),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -259,14 +304,16 @@ class HeadWorkerDetailPage extends StatelessWidget {
                     ),
                   ),
                   TextButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => HeadAssignTaskPage(
-                              preSelectedWorkerId: worker.workerId),
-                        ),
-                      );
-                    },
+                    onPressed: workerId == null
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => HeadAssignTaskPage(
+                                    preSelectedWorkerId: workerId),
+                              ),
+                            );
+                          },
                     icon: const Icon(Icons.add_task_rounded, size: 18),
                     label: const Text('Assign Task'),
                   ),
@@ -300,6 +347,18 @@ class HeadWorkerDetailPage extends StatelessWidget {
                                 ),
                               ),
                               TaskStatusBadge(status: task.status),
+                              if (task.workerId != null &&
+                                  task.status ==
+                                      CollectionTaskStatus.assigned) ...[
+                                IconButton(
+                                  tooltip: 'Revoke Task',
+                                  icon: const Icon(Icons.undo_rounded,
+                                      size: 20, color: Colors.redAccent),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () =>
+                                      _revokeTask(context, task),
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -350,11 +409,6 @@ class HeadWorkerDetailPage extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime date) {
-    final h = date.hour.toString().padLeft(2, '0');
-    final m = date.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -379,6 +433,185 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LiveLocationCard extends StatefulWidget {
+  const _LiveLocationCard({required this.workerId});
+
+  final String? workerId;
+
+  @override
+  State<_LiveLocationCard> createState() => _LiveLocationCardState();
+}
+
+class _LiveLocationCardState extends State<_LiveLocationCard> {
+  WorkerLocation? _location;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    final workerId = widget.workerId;
+    if (workerId == null) {
+      if (mounted && _location != null) setState(() => _location = null);
+      return;
+    }
+    WorkerLocation? location;
+    try {
+      location = await LocationService.instance
+          .fetchLocationForWorker(workerId);
+    } on Object {
+      location = null;
+    }
+    if (!mounted) return;
+    setState(() => _location = location);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _lastSeenLabel(DateTime updatedAt) {
+    final diff = DateTime.now().toUtc().difference(updatedAt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    final hours = diff.inHours;
+    return '$hours h ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final workerId = widget.workerId;
+    final location = _location;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                (location?.isLive ?? false)
+                    ? Icons.sensors
+                    : Icons.sensors_off,
+                size: 18,
+                color: (location?.isLive ?? false)
+                    ? AppColors.primaryGreen
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Live Location',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const Spacer(),
+              if (location != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: location.isLive
+                        ? AppColors.paleGreen
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    location.isLive
+                        ? 'Live'
+                        : (location.isSharing ? 'Paused' : 'Offline'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: location.isLive
+                          ? AppColors.primaryGreen
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (workerId == null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No Worker ID yet — generate one from the Workers page. Live location sharing starts once the worker uses the Live Location Map in their app.',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    height: 1.4),
+              ),
+            )
+          else if (location == null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No live position yet. When the worker opens "Live Location Map" in their app and taps Share Location, their position appears here automatically.',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    height: 1.4),
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LiveMapView(
+                  height: 180,
+                  title: '${workerId} position',
+                  center: LatLng(location.latitude, location.longitude),
+                  markers: [
+                    LiveMapMarker(
+                      LatLng(location.latitude, location.longitude),
+                      label: workerId,
+                      icon: Icons.local_shipping,
+                      color: AppColors.primaryGreen,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.pin_drop_outlined,
+                        size: 16, color: AppColors.primaryGreen),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
+                        style: TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Last updated ${_lastSeenLabel(location.updatedAt)}',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+        ],
+      ),
     );
   }
 }

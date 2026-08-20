@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
-/// Simple multi-color Google "G" icon without external assets.
+/// Official multi-color Google "G" logo, rendered from the bundled SVG asset.
+/// The exact same logo Google uses in its own sign-in buttons.
 class GoogleIcon extends StatelessWidget {
   const GoogleIcon({super.key, this.size = 22});
 
@@ -8,83 +10,11 @@ class GoogleIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return SvgPicture.asset(
+      'assets/images/google_g.svg',
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _GoogleIconPainter(),
-      ),
+      fit: BoxFit.contain,
     );
   }
-}
-
-class _GoogleIconPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    const blue = Color(0xFF4285F4);
-    const red = Color(0xFFEA4335);
-    const yellow = Color(0xFFFBBC05);
-    const green = Color(0xFF34A853);
-
-    final stroke = size.width * 0.18;
-    final arcPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-
-    arcPaint.color = blue;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - stroke / 2),
-      -0.4,
-      1.6,
-      false,
-      arcPaint,
-    );
-
-    arcPaint.color = green;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - stroke / 2),
-      1.2,
-      1.0,
-      false,
-      arcPaint,
-    );
-
-    arcPaint.color = yellow;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - stroke / 2),
-      2.2,
-      0.9,
-      false,
-      arcPaint,
-    );
-
-    arcPaint.color = red;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - stroke / 2),
-      3.1,
-      1.0,
-      false,
-      arcPaint,
-    );
-
-    final barPaint = Paint()
-      ..color = blue
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        center.dx - stroke * 0.1,
-        center.dy - stroke * 0.45,
-        radius + stroke * 0.2,
-        stroke * 0.9,
-      ),
-      barPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -4,21 +4,20 @@ import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/language_picker.dart';
 import '../../widgets/theme_switch_tile.dart';
 import '../about/about_page.dart';
-import '../auth/role_select_page.dart';
+import '../auth/auth_gate.dart';
+import '../manual/user_manual_page.dart';
+import '../support/call_assistant_page.dart';
+import '../support/development_team_page.dart';
 import '../support/help_support_page.dart';
+import 'send_notification_page.dart';
 
 class HeadProfilePage extends StatelessWidget {
   const HeadProfilePage({super.key});
 
-  void _logout(BuildContext context) {
-    AuthService.instance.logout();
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const RoleSelectPage()),
-      (route) => false,
-    );
-  }
+  Future<void> _logout(BuildContext context) => performLogout(context);
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +38,7 @@ class HeadProfilePage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: const Color(0xFF6A1B9A).withOpacity(0.1),
-                child: const Icon(Icons.admin_panel_settings_outlined,
-                    size: 44, color: Color(0xFF6A1B9A)),
-              ),
+              _Avatar(head: head),
               const SizedBox(height: 14),
               Text(
                 head.name,
@@ -59,15 +53,22 @@ class HeadProfilePage extends StatelessWidget {
               AppCard(
                 child: Column(
                   children: [
-                    _InfoRow(label: 'Head ID', value: head.id),
+                    _InfoRow(
+                      label: 'Head ID',
+                      value: 'HD-${head.id.substring(0, 8).toUpperCase()}',
+                    ),
                     const Divider(height: 20),
                     _InfoRow(label: 'Email', value: head.email),
                     const Divider(height: 20),
                     _InfoRow(label: 'Mobile', value: head.phone ?? '—'),
                     const Divider(height: 20),
-                    _InfoRow(
-                      label: 'Workers',
-                      value: '${AuthService.instance.workers.length}',
+                    FutureBuilder<int>(
+                      future:
+                          AuthService.instance.workers.then((w) => w.length),
+                      builder: (context, snapshot) => _InfoRow(
+                        label: 'Workers',
+                        value: snapshot.hasData ? '${snapshot.data}' : '…',
+                      ),
                     ),
                   ],
                 ),
@@ -84,10 +85,9 @@ class HeadProfilePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '• Separate login page — citizen and worker accounts are rejected here.\n'
-                      '• Generate Worker IDs — workers cannot create their own accounts.\n'
+                      '• One Google Sign-In for everyone — your role is assigned from the database by an administrator.\n'
+                      '• Promote citizens to workers by email — workers cannot self-register.\n'
                       '• Assign collection tasks with GPS coordinates.\n'
-                      '• Track every worker live on the map.\n'
                       '• Review proof photos — approve or send back to the worker.',
                       style: TextStyle(
                           color: AppColors.textSecondary,
@@ -99,6 +99,48 @@ class HeadProfilePage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const ThemeSwitchTile(),
+              const LanguageTile(),
+              _MenuTile(
+                icon: Icons.campaign_outlined,
+                title: 'Send Notification',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const SendNotificationPage()),
+                  );
+                },
+              ),
+              _MenuTile(
+                icon: Icons.menu_book_outlined,
+                title: 'User Manual',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) =>
+                            const UserManualPage(role: UserRole.head)),
+                  );
+                },
+              ),
+              _MenuTile(
+                icon: Icons.support_agent,
+                title: 'Call Our Assistant',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const CallAssistantPage()),
+                  );
+                },
+              ),
+              _MenuTile(
+                icon: Icons.engineering_outlined,
+                title: 'Development Team',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const DevelopmentTeamPage()),
+                  );
+                },
+              ),
               _MenuTile(
                 icon: Icons.help_outline,
                 title: 'Help & Support',
@@ -141,6 +183,31 @@ class HeadProfilePage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.head});
+
+  final AppUser head;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = head.photoUrl;
+    if (photo != null && photo.isNotEmpty) {
+      return CircleAvatar(
+        radius: 44,
+        backgroundColor: const Color(0xFF6A1B9A).withOpacity(0.1),
+        backgroundImage: NetworkImage(photo),
+        onBackgroundImageError: (_, __) {},
+      );
+    }
+    return CircleAvatar(
+      radius: 44,
+      backgroundColor: const Color(0xFF6A1B9A).withOpacity(0.1),
+      child: const Icon(Icons.admin_panel_settings_outlined,
+          size: 44, color: Color(0xFF6A1B9A)),
     );
   }
 }

@@ -1,8 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Google Maps API key is read from android/google_maps.properties so the real
+// key never lives in source control. Flutter regenerates local.properties on
+// every build (wiping manual edits), so we use a dedicated file instead.
+// Add: GOOGLE_MAPS_ANDROID_API_KEY=<your key> in android/google_maps.properties
+val googleMapsProperties = Properties()
+val googleMapsPropertiesFile = rootProject.file("google_maps.properties")
+if (googleMapsPropertiesFile.exists()) {
+    googleMapsPropertiesFile.inputStream().use { googleMapsProperties.load(it) }
+}
+val googleMapsApiKey: String =
+    googleMapsProperties.getProperty("GOOGLE_MAPS_ANDROID_API_KEY") ?: ""
 
 android {
     namespace = "com.safaisetu.safai_setu"
@@ -27,6 +41,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

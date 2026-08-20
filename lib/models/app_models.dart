@@ -58,14 +58,29 @@ class AppNotificationItem {
   const AppNotificationItem({
     required this.title,
     required this.message,
-    required this.timeAgo,
-    required this.isRead,
+    required this.createdAt,
+    this.isRead = false,
+    this.route,
   });
 
   final String title;
   final String message;
-  final String timeAgo;
+  final DateTime createdAt;
   final bool isRead;
+
+  /// Tap-routing payload (`screen|id`) used when the user opens the
+  /// notification from the history list.
+  final String? route;
+
+  /// Human-friendly relative time, e.g. "just now", "5 min ago", "2 h ago".
+  String get timeAgo {
+    final diff = DateTime.now().toUtc().difference(createdAt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} h ago';
+    final days = diff.inDays;
+    return days == 1 ? '1 day ago' : '$days days ago';
+  }
 }
 
 enum HotspotRisk { high, medium, low }

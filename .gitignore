@@ -21,6 +21,12 @@
 # is commented out by default.
 #.vscode/
 
+# Local credentials (never commit)
+lib/utils/local_config.dart
+android/google_maps.properties
+android/app/google-services.json
+android/local.properties
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id

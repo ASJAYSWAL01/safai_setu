@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../data/app_repository.dart';
 import '../../models/collection_task.dart';
-import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/task_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/app_tour.dart';
 import '../../widgets/dashboard_action_card.dart';
-import '../../widgets/list_tiles.dart';
+import '../../widgets/profile_avatar.dart';
 import '../../widgets/summary_stat_card.dart';
 import 'worker_live_map_page.dart';
+import 'worker_profile_page.dart';
 import 'worker_task_detail_page.dart';
 import 'worker_tasks_page.dart';
 
@@ -20,16 +21,87 @@ class WorkerDashboardPage extends StatefulWidget {
   State<WorkerDashboardPage> createState() => _WorkerDashboardPageState();
 }
 
-class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
+class _WorkerDashboardPageState extends State<WorkerDashboardPage>
+    with SingleTickerProviderStateMixin {
+  List<CollectionTask> _tasks = [];
+  bool _loading = true;
+  late final AnimationController _animCtrl;
+  late final List<Animation<double>> _tileOpacities;
+  late final List<Animation<Offset>> _tileOffsets;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _tileOpacities = List.generate(
+      4,
+      (i) => Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _animCtrl,
+          curve: Interval(
+            0.05 + 0.12 * i,
+            0.05 + 0.12 * i + 0.55,
+            curve: Curves.easeOutCubic,
+          ),
+        ),
+      ),
+    );
+    _tileOffsets = List.generate(
+      4,
+      (i) => Tween<Offset>(
+        begin: const Offset(0.0, 0.25),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: _animCtrl,
+          curve: Interval(
+            0.05 + 0.12 * i,
+            0.05 + 0.12 * i + 0.55,
+            curve: Curves.easeOutCubic,
+          ),
+        ),
+      ),
+    );
+    _loadTasks();
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTasks() async {
+    final workerId = AuthService.instance.user?.workerId;
+    List<CollectionTask> tasks;
+    if (workerId == null) {
+      tasks = [];
+    } else {
+      try {
+        tasks = await TaskService.instance.fetchTasksForWorker(workerId);
+      } on Object {
+        tasks = [];
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _tasks = tasks;
+      _loading = false;
+    });
+    _animCtrl.forward();
+  }
+
   Future<void> _refresh() async {
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (mounted) setState(() {});
+    await _loadTasks();
   }
 
   @override
   Widget build(BuildContext context) {
     final worker = AuthService.instance.user!;
-    final tasks = AppRepository.instance.tasksForWorker(worker.workerId!);
+    final tasks = _tasks;
     final pending =
         tasks.where((t) => t.status != CollectionTaskStatus.completed).length;
     final active = tasks
@@ -39,7 +111,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         .length;
     final completed =
         tasks.where((t) => t.status == CollectionTaskStatus.completed).length;
-    final location = AppRepository.instance.lastLocation(worker.workerId!);
 
     return Scaffold(
       backgroundColor: AppColors.mintBackground,
@@ -92,16 +163,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.paleGreen,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              Icons.local_shipping_rounded,
-                              color: AppColors.primaryGreen,
-                            ),
+                          ProfileAvatar(
+                            radius: 22,
+                            onTap: () =>
+                                _push(context, const WorkerProfilePage()),
                           ),
                         ],
                       ),
@@ -110,12 +175,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                         child: Row(
                           children: [
                             Icon(
-                              location == null
-                                  ? Icons.location_off_outlined
-                                  : Icons.location_on,
-                              color: location == null
-                                  ? AppColors.textSecondary
-                                  : AppColors.primaryGreen,
+                              Icons.assignment_outlined,
+                              color: AppColors.primaryGreen,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -123,16 +184,14 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    location == null
-                                        ? 'Location not shared yet'
-                                        : 'Location shared with Head',
+                                    '${tasks.length} tasks assigned',
                                     style:
                                         TextStyle(fontWeight: FontWeight.w600),
                                   ),
                                   Text(
-                                    location == null
-                                        ? 'Open the Live Map tab to start sharing'
-                                        : '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
+                                    tasks.isEmpty
+                                        ? 'Your Head will assign tasks to your Worker ID'
+                                        : '$pending pending · $completed completed',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary,
@@ -146,6 +205,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                       ),
                       const SizedBox(height: 20),
                       GridView.count(
+                        key: TourKeys.statGridKey,
                         crossAxisCount: 2,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -153,37 +213,57 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                         crossAxisSpacing: 12,
                         childAspectRatio: 1.28,
                         children: [
-                          SummaryStatCard(
-                            icon: Icons.assignment_outlined,
-                            label: 'Assigned Tasks',
-                            value: '$pending',
-                            color: const Color(0xFF1565C0),
-                            onTap: () =>
-                                _push(context, const WorkerTasksPage()),
+                          _AnimatedStatTile(
+                            opacity: _tileOpacities[0],
+                            offset: _tileOffsets[0],
+                            child: SummaryStatCard(
+                              key: TourKeys.statTileKeys[0],
+                              icon: Icons.assignment_outlined,
+                              label: 'Assigned Tasks',
+                              value: '$pending',
+                              color: const Color(0xFF1565C0),
+                              onTap: () =>
+                                  _push(context, const WorkerTasksPage()),
+                            ),
                           ),
-                          SummaryStatCard(
-                            icon: Icons.local_shipping_rounded,
-                            label: 'In Progress',
-                            value: '$active',
-                            color: Colors.orange,
-                            onTap: () =>
-                                _push(context, const WorkerTasksPage()),
+                          _AnimatedStatTile(
+                            opacity: _tileOpacities[1],
+                            offset: _tileOffsets[1],
+                            child: SummaryStatCard(
+                              key: TourKeys.statTileKeys[1],
+                              icon: Icons.local_shipping_rounded,
+                              label: 'In Progress',
+                              value: '$active',
+                              color: Colors.orange,
+                              onTap: () =>
+                                  _push(context, const WorkerTasksPage()),
+                            ),
                           ),
-                          SummaryStatCard(
-                            icon: Icons.check_circle_outline,
-                            label: 'Completed',
-                            value: '$completed',
-                            color: AppColors.primaryGreen,
-                            onTap: () =>
-                                _push(context, const WorkerTasksPage()),
+                          _AnimatedStatTile(
+                            opacity: _tileOpacities[2],
+                            offset: _tileOffsets[2],
+                            child: SummaryStatCard(
+                              key: TourKeys.statTileKeys[2],
+                              icon: Icons.check_circle_outline,
+                              label: 'Completed',
+                              value: '$completed',
+                              color: AppColors.primaryGreen,
+                              onTap: () =>
+                                  _push(context, const WorkerTasksPage()),
+                            ),
                           ),
-                          SummaryStatCard(
-                            icon: Icons.photo_camera_outlined,
-                            label: 'Proofs Submitted',
-                            value: '$completed',
-                            color: const Color(0xFF6A1B9A),
-                            onTap: () =>
-                                _push(context, const WorkerTasksPage()),
+                          _AnimatedStatTile(
+                            opacity: _tileOpacities[3],
+                            offset: _tileOffsets[3],
+                            child: SummaryStatCard(
+                              key: TourKeys.statTileKeys[3],
+                              icon: Icons.photo_camera_outlined,
+                              label: 'Proofs Submitted',
+                              value: '$completed',
+                              color: const Color(0xFF6A1B9A),
+                              onTap: () =>
+                                  _push(context, const WorkerTasksPage()),
+                            ),
                           ),
                         ],
                       ),
@@ -210,7 +290,12 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                       const SizedBox(height: 24),
                       const SectionHeader(title: "Today's Tasks"),
                       const SizedBox(height: 8),
-                      if (tasks.isEmpty)
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (tasks.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Text(
@@ -237,6 +322,29 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   }
 }
 
+class _AnimatedStatTile extends StatelessWidget {
+  const _AnimatedStatTile({
+    required this.opacity,
+    required this.offset,
+    required this.child,
+  });
+
+  final Animation<double> opacity;
+  final Animation<Offset> offset;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: opacity,
+      child: SlideTransition(
+        position: offset,
+        child: child,
+      ),
+    );
+  }
+}
+
 class _TaskTile extends StatelessWidget {
   const _TaskTile({required this.task});
 
@@ -246,12 +354,17 @@ class _TaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       padding: const EdgeInsets.all(14),
-      onTap: () {
-        Navigator.of(context).push(
+      margin: const EdgeInsets.only(bottom: 10),
+      onTap: () async {
+        await Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => WorkerTaskDetailPage(taskId: task.id),
           ),
         );
+        // Reflect status changes made in the detail page (e.g. completed).
+        final state =
+            context.findAncestorStateOfType<_WorkerDashboardPageState>();
+        state?._loadTasks();
       },
       child: Row(
         children: [

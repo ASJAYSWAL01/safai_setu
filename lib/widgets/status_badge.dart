@@ -17,26 +17,46 @@ class StatusBadge extends StatelessWidget {
   Color get _backgroundColor {
     switch (status) {
       case ComplaintStatus.pending:
-        return const Color(0xFFFFF3E0);
+        return AppColors.isDark
+            ? const Color(0xFFE65100).withOpacity(0.18)
+            : const Color(0xFFFFF3E0);
       case ComplaintStatus.assigned:
-        return const Color(0xFFE3F2FD);
+        return AppColors.isDark
+            ? const Color(0xFF1565C0).withOpacity(0.22)
+            : const Color(0xFFE3F2FD);
       case ComplaintStatus.inProgress:
-        return const Color(0xFFE8EAF6);
+        return AppColors.isDark
+            ? const Color(0xFF3949AB).withOpacity(0.22)
+            : const Color(0xFFE8EAF6);
       case ComplaintStatus.resolved:
         return AppColors.paleGreen;
+      case ComplaintStatus.rejected:
+        return AppColors.isDark
+            ? const Color(0xFFC62828).withOpacity(0.2)
+            : const Color(0xFFFFEBEE);
     }
   }
 
   Color get _textColor {
     switch (status) {
       case ComplaintStatus.pending:
-        return const Color(0xFFE65100);
+        return AppColors.isDark
+            ? const Color(0xFFFFB74D)
+            : const Color(0xFFE65100);
       case ComplaintStatus.assigned:
-        return const Color(0xFF1565C0);
+        return AppColors.isDark
+            ? const Color(0xFF64B5F6)
+            : const Color(0xFF1565C0);
       case ComplaintStatus.inProgress:
-        return const Color(0xFF3949AB);
+        return AppColors.isDark
+            ? const Color(0xFF9FA8DA)
+            : const Color(0xFF3949AB);
       case ComplaintStatus.resolved:
         return AppColors.darkGreen;
+      case ComplaintStatus.rejected:
+        return AppColors.isDark
+            ? const Color(0xFFE57373)
+            : const Color(0xFFC62828);
     }
   }
 
@@ -71,26 +91,30 @@ class TaskStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg) = switch (status) {
-      CollectionTaskStatus.assigned => (
-          const Color(0xFFFFF3E0),
-          const Color(0xFFE65100)
-        ),
-      CollectionTaskStatus.enRoute => (
-          const Color(0xFFE3F2FD),
-          const Color(0xFF1565C0)
-        ),
-      CollectionTaskStatus.collecting => (
-          const Color(0xFFE8EAF6),
-          const Color(0xFF3949AB)
-        ),
+      CollectionTaskStatus.assigned => AppColors.isDark
+          ? (const Color(0xFFE65100).withOpacity(0.18),
+              const Color(0xFFFFB74D))
+          : (const Color(0xFFFFF3E0), const Color(0xFFE65100)),
+      CollectionTaskStatus.enRoute => AppColors.isDark
+          ? (const Color(0xFF1565C0).withOpacity(0.22),
+              const Color(0xFF64B5F6))
+          : (const Color(0xFFE3F2FD), const Color(0xFF1565C0)),
+      CollectionTaskStatus.collecting => AppColors.isDark
+          ? (const Color(0xFF3949AB).withOpacity(0.22),
+              const Color(0xFF9FA8DA))
+          : (const Color(0xFFE8EAF6), const Color(0xFF3949AB)),
       CollectionTaskStatus.completed => (
           AppColors.paleGreen,
           AppColors.darkGreen
         ),
-      CollectionTaskStatus.rejected => (
-          const Color(0xFFFFEBEE),
-          const Color(0xFFC62828)
-        ),
+      CollectionTaskStatus.rejected => AppColors.isDark
+          ? (const Color(0xFFC62828).withOpacity(0.2),
+              const Color(0xFFE57373))
+          : (const Color(0xFFFFEBEE), const Color(0xFFC62828)),
+      CollectionTaskStatus.revoked => AppColors.isDark
+          ? (const Color(0xFF546E7A).withOpacity(0.22),
+              const Color(0xFF90A4AE))
+          : (const Color(0xFFECEFF1), const Color(0xFF546E7A)),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

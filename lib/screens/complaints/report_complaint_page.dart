@@ -1,14 +1,22 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../data/mock_data_repository.dart';
-import '../../models/complaint.dart';
+import '../../services/auth_service.dart';
+import '../../services/complaint_service.dart';
+import '../../services/network_service.dart';
+import '../../services/profile_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/custom_button.dart';
 import '../../utils/validators.dart';
-import 'complaint_details_page.dart';
+import '../../widgets/complete_profile_dialog.dart';
+import '../../widgets/complaint_map_picker.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import 'complaint_details_page.dart';
 
 class ReportComplaintPage extends StatefulWidget {
   const ReportComplaintPage({super.key});
@@ -20,70 +28,30 @@ class ReportComplaintPage extends StatefulWidget {
 class _ReportComplaintPageState extends State<ReportComplaintPage> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
-  String? _selectedCategory;
   final ImagePicker _picker = ImagePicker();
+
+  String? _selectedCategory;
   String? _photoPath;
-  String _location = 'Not set (tap button below to fetch)';
-  double? _latitude;
-  double? _longitude;
+  LatLng? _selectedPosition;
+  String _locationStatus = 'Location not selected';
   bool _isSubmitting = false;
-  bool _isLocationLoading = false;
 
-  Future<void> _getCurrentLocation() async {
-    setState(() => _isLocationLoading = true);
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw 'Location services are disabled.';
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw 'Location permissions are denied.';
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw 'Location permissions are permanently denied.';
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      setState(() {
-        _location =
-            'Lat: ${position.latitude.toStringAsFixed(6)}, Long: ${position.longitude.toStringAsFixed(6)}';
-        _latitude = position.latitude;
-        _longitude = position.longitude;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching location: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLocationLoading = false);
-      }
-    }
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Future<void> _takePhoto() async {
     try {
-      final XFile? photo = await _picker.pickImage(
+      final photo = await _picker.pickImage(
         source: ImageSource.camera,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
       );
       if (photo != null) {
-        setState(() {
-          _photoPath = photo.path;
-        });
+        setState(() => _photoPath = photo.path);
       }
     } catch (e) {
       if (mounted) {
@@ -92,12 +60,6 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
         );
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _descriptionController.dispose();
-    super.dispose();
   }
 
   Future<void> _submitComplaint() async {
@@ -109,47 +71,130 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
     }
     if (!_formKey.currentState!.validate()) return;
 
+    final user = AuthService.instance.user;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to submit.')),
+      );
+      return;
+    }
+
+    // The citizen must complete their profile (phone number + app login
+    // password) before reporting, so the department and the assigned worker
+    // can contact them about the complaint.
+    if (user.isCitizen) {
+      bool complete;
+      try {
+        complete = await ProfileService.instance.hasCompletedProfile(user.id);
+      } on Object {
+        complete = false;
+      }
+      if (!complete) {
+        final saved = await showCompleteProfileDialog(
+          context,
+          initialPhone: user.phone,
+        );
+        if (saved) {
+          await AuthService.instance.refreshCurrentUser();
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please complete your profile (phone number) before reporting a complaint.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    if (_selectedPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select a complaint location using GPS or the map.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!await NetworkService.instance.hasInternetAccess()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(NetworkService.instance.offlineMessage())),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
 
-    final complaint = MockDataRepository.instance.addComplaint(
-      category: _selectedCategory!,
-      description: _descriptionController.text.trim(),
-      location: _location,
-      hasPhoto: _photoPath != null,
-      photoPath: _photoPath,
-      latitude: _latitude,
-      longitude: _longitude,
-    );
+    try {
+      final complaint = await ComplaintService.instance.submitComplaint(
+        category: _selectedCategory!,
+        description: _descriptionController.text.trim(),
+        latitude: _selectedPosition!.latitude,
+        longitude: _selectedPosition!.longitude,
+        locationText:
+            'Lat: ${_selectedPosition!.latitude.toStringAsFixed(6)}, Long: ${_selectedPosition!.longitude.toStringAsFixed(6)}',
+        localPhotoPath: _photoPath,
+      );
 
-    setState(() => _isSubmitting = false);
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
 
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: AppColors.primaryGreen),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Complaint Submitted Successfully!')),
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Complaint Submitted Successfully!')),
+            ],
+          ),
+          content: Text('Complaint ID: ${complaint.displayId}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
           ],
         ),
-        content: Text('Complaint ID: ${complaint.id}'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+      );
 
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ComplaintDetailsPage(complaintId: complaint.id),
+        ),
+      );
+    } on AuthException catch (e) {
+      _showSubmitError(e.message);
+    } on StorageException catch (e) {
+      _showSubmitError('Photo upload failed: ${e.message}');
+    } on PostgrestException catch (e) {
+      _showSubmitError('Could not save complaint: ${e.message}');
+    } on SocketException {
+      _showSubmitError(NetworkService.instance.offlineMessage());
+    } on Object catch (e) {
+      _showSubmitError('Submission failed: $e');
+    }
+  }
+
+  void _showSubmitError(String message) {
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => ComplaintDetailsPage(complaintId: complaint.id),
+    setState(() => _isSubmitting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+          label: 'Retry',
+          onPressed: _submitComplaint,
+        ),
       ),
     );
   }
@@ -287,52 +332,23 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.borderColor),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.location_on,
-                              color: AppColors.primaryGreen),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Current Location',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _location,
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed:
-                            _isLocationLoading ? null : _getCurrentLocation,
-                        icon: _isLocationLoading
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.primaryGreen),
-                                ),
-                              )
-                            : const Icon(Icons.my_location, size: 18),
-                        label: Text(_isLocationLoading
-                            ? 'Fetching Location...'
-                            : 'Use Current Location'),
-                      ),
-                    ],
+                ComplaintMapPicker(
+                  initialPosition: _selectedPosition,
+                  onPositionChanged: (position) {
+                    setState(() {
+                      _selectedPosition = position;
+                      _locationStatus = 'Location selected';
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _locationStatus,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _selectedPosition != null
+                        ? AppColors.primaryGreen
+                        : AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -340,7 +356,7 @@ class _ReportComplaintPageState extends State<ReportComplaintPage> {
                   label: 'Submit Complaint',
                   icon: Icons.send_rounded,
                   isLoading: _isSubmitting,
-                  onPressed: _submitComplaint,
+                  onPressed: _isSubmitting ? null : _submitComplaint,
                 ),
                 const SizedBox(height: 16),
               ],

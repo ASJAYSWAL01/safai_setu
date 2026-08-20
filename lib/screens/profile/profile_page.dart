@@ -1,49 +1,96 @@
 import 'package:flutter/material.dart';
 
-import '../../data/mock_data_repository.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/complaint_service.dart';
+import '../../services/theme_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/complete_profile_dialog.dart';
+import '../../widgets/language_picker.dart';
 import '../../widgets/theme_switch_tile.dart';
 import '../about/about_page.dart';
-import '../auth/role_select_page.dart';
-import '../complaints/my_complaints_page.dart';
+import '../auth/auth_gate.dart';
+import '../manual/user_manual_page.dart';
+import '../support/call_assistant_page.dart';
+import '../support/development_team_page.dart';
 import '../notifications/notifications_page.dart';
 import '../support/help_support_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
-  void _openAbout(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AboutPage()),
-    );
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  ComplaintStats? _stats;
+  bool _loadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+    AuthService.instance.currentUser.addListener(_onUserChanged);
   }
 
-  void _openHelp(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const HelpSupportPage()),
-    );
+  @override
+  void dispose() {
+    AuthService.instance.currentUser.removeListener(_onUserChanged);
+    super.dispose();
   }
 
-  void _logout(BuildContext context) {
-    AuthService.instance.logout();
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const RoleSelectPage()),
-      (route) => false,
+  void _onUserChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _editProfile() async {
+    final user = AuthService.instance.user;
+    if (user == null) return;
+    final saved = await showCompleteProfileDialog(
+      context,
+      initialPhone: user.phone,
+      isEditing: true,
     );
+    if (saved) {
+      await AuthService.instance.refreshCurrentUser();
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final stats = await ComplaintService.instance.fetchMyStats();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _loadingStats = false;
+        });
+      }
+    } on Object {
+      if (mounted) setState(() => _loadingStats = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final profile = MockDataRepository.instance.profile;
-    final AppUser user = AuthService.instance.user!;
+    final user = AuthService.instance.user;
 
-    return Scaffold(
-      backgroundColor: AppColors.mintBackground,
-      appBar: AppBar(
-        title: Text(
-          'Profile',
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Rebuild instantly when the theme toggles (works whether this page is
+    // the Profile tab or pushed from the home screen).
+    return ValueListenableBuilder<bool>(
+      valueListenable: ThemeService.instance.isDark,
+      builder: (context, _, __) => Scaffold(
+        backgroundColor: AppColors.mintBackground,
+        appBar: AppBar(
+          title: Text(
+            'Profile',
           style: TextStyle(
               fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
@@ -54,23 +101,49 @@ class ProfilePage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: AppColors.paleGreen,
-                child:
-                    Icon(Icons.person, size: 44, color: AppColors.primaryGreen),
+              _Avatar(
+                name: user.name,
+                photoUrl: user.photoUrl,
+                isChampion: (_stats?.resolved ?? 0) > 10,
               ),
               const SizedBox(height: 14),
               Text(
                 user.name,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
+              if ((_stats?.resolved ?? 0) > 10) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFB300), Color(0xFFFF8F00)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.star, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'Safai Champion',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
               Text(
                 'Citizen Account',
                 style: TextStyle(color: AppColors.textSecondary),
               ),
-              if (user.phone != null)
+              if (user.phone != null && user.phone!.trim().isNotEmpty)
                 Text(
                   user.phone!,
                   style: TextStyle(color: AppColors.textSecondary),
@@ -85,28 +158,23 @@ class ProfilePage extends StatelessWidget {
                   Expanded(
                     child: _StatBox(
                       label: 'Total Complaints',
-                      value: '${profile.totalComplaints}',
+                      value: _loadingStats ? '…' : '${_stats?.total ?? 0}',
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _StatBox(
                       label: 'Resolved',
-                      value: '${profile.resolvedComplaints}',
+                      value: _loadingStats ? '…' : '${_stats?.resolved ?? 0}',
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
               _MenuTile(
-                icon: Icons.assignment_outlined,
-                title: 'My Complaints',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                        builder: (_) => const MyComplaintsPage()),
-                  );
-                },
+                icon: Icons.person_outline,
+                title: 'Edit Profile',
+                onTap: _editProfile,
               ),
               _MenuTile(
                 icon: Icons.notifications_outlined,
@@ -118,29 +186,70 @@ class ProfilePage extends StatelessWidget {
                   );
                 },
               ),
+              _MenuTile(
+                icon: Icons.menu_book_outlined,
+                title: 'User Manual',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) =>
+                            const UserManualPage(role: UserRole.citizen)),
+                  );
+                },
+              ),
               const ThemeSwitchTile(),
+              const LanguageTile(),
+              _MenuTile(
+                icon: Icons.support_agent,
+                title: 'Call Our Assistant',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const CallAssistantPage()),
+                  );
+                },
+              ),
+              _MenuTile(
+                icon: Icons.engineering_outlined,
+                title: 'Development Team',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const DevelopmentTeamPage()),
+                  );
+                },
+              ),
               _MenuTile(
                 icon: Icons.help_outline,
                 title: 'Help & Support',
-                onTap: () => _openHelp(context),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const HelpSupportPage()),
+                  );
+                },
               ),
               _MenuTile(
                 icon: Icons.info_outline,
                 title: 'About Safai Setu',
-                onTap: () => _openAbout(context),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _logout(context),
+                  onPressed: () => performLogout(context),
                   icon: const Icon(Icons.logout, color: Colors.redAccent),
                   label: const Text(
                     'Logout',
                     style: TextStyle(
                         color: Colors.redAccent, fontWeight: FontWeight.w600),
                   ),
-                  style: OutlinedButton.styleFrom(
+                  style:              OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     side: const BorderSide(color: Colors.redAccent),
                     shape: RoundedRectangleBorder(
@@ -152,6 +261,71 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.name, this.photoUrl, this.isChampion = false});
+
+  final String name;
+  final String? photoUrl;
+  final bool isChampion;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = isChampion
+        ? const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [Color(0xFFFFB300), Color(0xFFFF8F00)],
+            ),
+          )
+        : null;
+
+    final child = CircleAvatar(
+      radius: isChampion ? 48 : 44,
+      backgroundColor: AppColors.paleGreen,
+      backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
+          ? NetworkImage(photoUrl!)
+          : null,
+      onBackgroundImageError: (_, __) {},
+      child: (photoUrl == null || photoUrl!.isEmpty)
+          ? Text(
+              name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?',
+              style: TextStyle(
+                fontSize: isChampion ? 30 : 28,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryGreen,
+              ),
+            )
+          : null,
+    );
+
+    if (!isChampion) return child;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: border,
+          child: child,
+        ),
+        Positioned(
+          right: -2,
+          top: -2,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFB300),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.star, color: Colors.white, size: 14),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -221,7 +395,7 @@ class _MenuTile extends StatelessWidget {
       ),
       child: ListTile(
         leading: Icon(icon, color: AppColors.primaryGreen),
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.w500)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
         trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary),
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

@@ -19,26 +19,41 @@ class HeadEditWorkerPage extends StatefulWidget {
 
 class _HeadEditWorkerPageState extends State<HeadEditWorkerPage> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
-  late final TextEditingController _vehicleController;
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _vehicleController = TextEditingController();
   bool _isSaving = false;
-
-  AppUser? get _worker {
-    for (final account in AuthService.instance.workers) {
-      if (account.id == widget.workerId) return account;
-    }
-    return null;
-  }
+  AppUser? _worker;
+  bool _loadingWorker = true;
 
   @override
   void initState() {
     super.initState();
-    final worker = _worker;
-    _nameController = TextEditingController(text: worker?.name ?? '');
-    _phoneController = TextEditingController(text: worker?.phone ?? '');
-    _vehicleController =
-        TextEditingController(text: worker?.vehicleNumber ?? '');
+    _loadWorker();
+  }
+
+  Future<void> _loadWorker() async {
+    List<AppUser> workers;
+    try {
+      workers = await AuthService.instance.workers;
+    } on Object {
+      workers = [];
+    }
+    if (!mounted) return;
+    AppUser? found;
+    for (final account in workers) {
+      if (account.id == widget.workerId) {
+        found = account;
+        break;
+      }
+    }
+    setState(() {
+      _worker = found;
+      _loadingWorker = false;
+      _nameController.text = found?.name ?? '';
+      _phoneController.text = found?.phone ?? '';
+      _vehicleController.text = found?.vehicleNumber ?? '';
+    });
   }
 
   @override
@@ -52,10 +67,8 @@ class _HeadEditWorkerPageState extends State<HeadEditWorkerPage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
 
-    final error = AuthService.instance.updateWorker(
+    final error = await AuthService.instance.updateWorker(
       id: widget.workerId,
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
@@ -80,10 +93,16 @@ class _HeadEditWorkerPageState extends State<HeadEditWorkerPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingWorker) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Edit Worker')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     final worker = _worker;
     if (worker == null) {
       return Scaffold(
-        appBar: AppBar(title: Text('Edit Worker')),
+        appBar: AppBar(title: const Text('Edit Worker')),
         body: const Center(child: Text('Worker not found')),
       );
     }
