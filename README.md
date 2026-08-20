@@ -170,12 +170,14 @@ safai_setu/
 Getting started as a citizen is extremely simple — **no technical setup required!**
 
 1. **Download the APK**
-   - Download the safai_setu.apk file onto your Android device.
+   - The release APK is included in this repository as **`app-release.apk`** (located in the project root).
+   - Transfer the file **`app-release.apk`** to your Android device (via USB, Google Drive, WhatsApp, or any other method).
 
 2. **Install the APK**
-   - Open the downloaded APK file.
+   - On your Android device, open the **`app-release.apk`** file using your file manager.
    - If prompted, allow installation from unknown sources in your Android settings:
-     Settings → Security → Install Unknown Apps → Allow
+     `Settings → Security → Install Unknown Apps → Allow`
+   - Tap **Install** and wait for the installation to complete.
 
 3. **Launch the App**
    - Open **Safai Setu** from your app drawer.
