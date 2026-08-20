@@ -118,48 +118,48 @@ The application supports **three distinct user roles**, each with its own dedica
 
 ## Project Structure
 
-`
+```
 safai_setu/
-|-- lib/
-|   |-- main.dart                   # App entry point and Firebase/Supabase init
-|   |-- data/                       # Static data repositories (categories, etc.)
-|   |-- l10n/                       # Localization / multilingual support
-|   |-- models/                     # Data models (Complaint, Task, User, etc.)
-|   |-- screens/
-|   |   |-- auth/                   # Authentication screens
-|   |   |-- complaints/             # Report and view complaint screens
-|   |   |-- head/                   # Head dashboard and management screens
-|   |   |-- home/                   # Citizen home screen
-|   |   |-- hotspots/               # Waste hotspot map screen
-|   |   |-- map/                    # General map screens
-|   |   |-- notifications/          # Notification center
-|   |   |-- profile/                # User profile screen
-|   |   |-- splash/                 # Splash/loading screen
-|   |   |-- support/                # Help and support
-|   |   |-- tracking/               # Complaint tracking
-|   |   |-- worker/                 # Worker task screens
-|   |   |-- about/                  # About / manual
-|   |   |-- login_page.dart         # Unified login page (role-based)
-|   |   -- main_shell.dart         # Bottom nav shell for citizens
-|   |-- services/                   # Business logic and API services
-|   |   |-- auth_service.dart       # Authentication and session management
-|   |   |-- complaint_service.dart  # Complaint CRUD operations
-|   |   |-- task_service.dart       # Worker task management
-|   |   |-- notification_service.dart # FCM and local notifications
-|   |   |-- location_service.dart   # GPS and location utilities
-|   |   |-- hotspot_service.dart    # Waste hotspot detection
-|   |   |-- profile_service.dart    # User profile management
-|   |   -- route_optimization_service.dart # Collection route optimizer
-|   |-- theme/                      # App theme, colors and typography
-|   |-- utils/                      # Validators and utility functions
-|   -- widgets/                    # Reusable UI components
-|-- assets/
-|   -- images/                     # App images and mascot
-|-- android/                        # Android native configuration
-|-- supabase/                       # Supabase edge functions / config
-|-- supabase_setup.sql              # Full database schema and setup SQL
--- pubspec.yaml                    # Dependencies and asset declarations
-`
+├── lib/
+│   ├── main.dart                          # App entry point and Firebase/Supabase init
+│   ├── data/                              # Static data repositories (categories, etc.)
+│   ├── l10n/                              # Localization / multilingual support
+│   ├── models/                            # Data models (Complaint, Task, User, etc.)
+│   ├── screens/
+│   │   ├── auth/                          # Authentication screens
+│   │   ├── complaints/                    # Report and view complaint screens
+│   │   ├── head/                          # Head dashboard and management screens
+│   │   ├── home/                          # Citizen home screen
+│   │   ├── hotspots/                      # Waste hotspot map screen
+│   │   ├── map/                           # General map screens
+│   │   ├── notifications/                 # Notification center
+│   │   ├── profile/                       # User profile screen
+│   │   ├── splash/                        # Splash/loading screen
+│   │   ├── support/                       # Help and support
+│   │   ├── tracking/                      # Complaint tracking
+│   │   ├── worker/                        # Worker task screens
+│   │   ├── about/                         # About / manual
+│   │   ├── login_page.dart                # Unified login page (role-based)
+│   │   └── main_shell.dart                # Bottom nav shell for citizens
+│   ├── services/                          # Business logic and API services
+│   │   ├── auth_service.dart              # Authentication and session management
+│   │   ├── complaint_service.dart         # Complaint CRUD operations
+│   │   ├── task_service.dart              # Worker task management
+│   │   ├── notification_service.dart      # FCM and local notifications
+│   │   ├── location_service.dart          # GPS and location utilities
+│   │   ├── hotspot_service.dart           # Waste hotspot detection
+│   │   ├── profile_service.dart           # User profile management
+│   │   └── route_optimization_service.dart # Collection route optimizer
+│   ├── theme/                             # App theme, colors and typography
+│   ├── utils/                             # Validators and utility functions
+│   └── widgets/                           # Reusable UI components
+├── assets/
+│   └── images/                            # App images and mascot
+├── android/                               # Android native configuration
+├── supabase/                              # Supabase edge functions / config
+├── supabase_setup.sql                     # Full database schema and setup SQL
+└── pubspec.yaml                           # Dependencies and asset declarations
+```
 
 ---
 
@@ -231,7 +231,7 @@ If you want to run the project from source code, ensure you have the following i
 - A configured google-services.json in ndroid/app/ (Firebase)
 - Supabase project credentials configured in lib/main.dart
 
-`ash
+```bash
 # 1. Clone the repository
 git clone <your-repo-url>
 cd safai_setu
@@ -241,7 +241,7 @@ flutter pub get
 
 # 3. Run the app on a connected device/emulator
 flutter run
-`
+```
 
 ---
 
